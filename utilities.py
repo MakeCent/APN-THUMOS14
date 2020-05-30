@@ -5,6 +5,34 @@
 # Date  : 26/5/2020
 
 
+def video2images(video_path, save_path, suffix='mp4'):
+    """
+    Convert mp4 videos to images and store them in folders.
+    :param video_path:
+        String. Directory that contain video files.
+    :param save_path:
+        String. Direcotory that will be used to store images. Sub-folders will be made here.
+    :param suffix:
+        String. Video suffix. e.g. 'mp4'
+    :return:
+        Nothing.
+    """
+    from pathlib import Path
+    import cv2
+    videos = video_path.glob('*.'+suffix)
+    for video in videos:
+        image_path = Path(save_path, video.stem)
+        image_path.mkdir()
+        vidcap = cv2.VideoCapture(video.__str__())
+        success, image = vidcap.read()
+        count = 0
+        while success:
+            cv2.imwrite("%s/%s.jpg" % (image_path, str(count).zfill(5)), image)     # save frame as JPEG file
+            success, image = vidcap.read()
+            print('Read a new frame: ', success)
+            count += 1
+
+
 def annotation_time2frame(mp4path, annotation_path):
     """
     Transfer timestamp-style temporal annotation file to frame-style
