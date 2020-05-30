@@ -16,10 +16,14 @@ def video2images(video_path, save_path, suffix='mp4'):
         String. Video suffix. e.g. 'mp4'
     :return:
         Nothing.
+    Example:
+    video_path = "/mnt/louis-consistent/Datasets/THUMOS14/TH14_test_set_mp4"
+    save_path = "/mnt/louis-consistent/Datasets/THUMOS14/Test"
+    suffix = "mp4"
     """
     from pathlib import Path
     import cv2
-    videos = video_path.glob('*.'+suffix)
+    videos = Path(video_path).glob('*.'+suffix)
     for video in videos:
         image_path = Path(save_path, video.stem)
         image_path.mkdir()
