@@ -1,5 +1,5 @@
 program: train.py
-method: random
+method: bayes
 metric:
   name: v_n_mae
   goal: minimize
@@ -11,6 +11,8 @@ parameters:
     values:
       - mae
       - mse
+  learning_rate:
+    values: [0.001, 0.0001, 0.00001]
   action:
     distribution: categorical
     values:
@@ -34,7 +36,3 @@ parameters:
     - TennisSwing
     - ThrowDiscus
     - VolleyballSpiking
-  epochs:
-    value: 5
-  batch_size:
-    value: 32
