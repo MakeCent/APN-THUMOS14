@@ -30,7 +30,7 @@ hyperparameter_defaults = dict(
     epochs=30 if formal_training is True else 5,
     action="BaseballPitch"
 )
-wandb.init(config=hyperparameter_defaults, entity="makecent", project="thumos14", name=now)
+wandb.init(config=hyperparameter_defaults, name=now)
 config = wandb.config
 wandbcb = WandbCallback(monitor='val_n_mae', save_model=False)
 
