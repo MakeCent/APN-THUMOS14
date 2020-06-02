@@ -18,7 +18,7 @@ def video2images(video_path, save_path, suffix='mp4'):
         Nothing.
     Example:
     video_path = "/mnt/louis-consistent/Datasets/THUMOS14/TH14_test_set_mp4"
-    save_path = "/mnt/louis-consistent/Datasets/THUMOS14/Test"
+    save_path = "/mnt/louis-consistent/Datasets/THUMOS14/Test"2
     suffix = "mp4"
     """
     from pathlib import Path
@@ -68,6 +68,17 @@ def annotation_time2frame(mp4path, annotation_path):
                 vc.set(cv.CAP_PROP_POS_MSEC, end*1000)
                 endf = int(vc.get(cv.CAP_PROP_POS_FRAMES))
                 writer.writerow([vn, startf, endf])
+
+
+def build_datagenerators(data_paths, labels, preprocess_input, **kwargs):
+    import pandas as pd
+    from tensorflow.keras.preprocessing.image import ImageDataGenerator
+
+    df = pd.DataFrame({'paths': data_paths, 'labels': labels})
+    preprocessed = ImageDataGenerator(preprocessing_function=preprocess_input)
+
+    data_generator = preprocessed.flow_from_dataframe(df, x_col='paths', y_col='labels', **kwargs)
+    return data_generator
 
 
 def normalize_mae(y_range):
