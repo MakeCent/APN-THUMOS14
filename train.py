@@ -16,10 +16,16 @@ from tensorflow.keras.callbacks import ModelCheckpoint
 import wandb
 from wandb.keras import WandbCallback
 import datetime
+import socket
+
+if socket.gethostname() == "louis-2":
+    physical_devices = tf.config.experimental.list_physical_devices('GPU')
+    for physical_device in physical_devices:
+        tf.config.experimental.set_memory_growth(physical_device, True)
 
 now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 # if not formal_training then just a memo experiments will be conducted
-formal_training = True
+formal_training = False
 
 hyperparameter_defaults = dict(
     loss='mse',
