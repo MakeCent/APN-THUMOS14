@@ -25,7 +25,7 @@ if socket.gethostname() == "louis-2":
 
 now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 # if not formal_training then just a memo experiments will be conducted
-formal_training = False
+formal_training = True
 
 hyperparameter_defaults = dict(
     loss='mse',
