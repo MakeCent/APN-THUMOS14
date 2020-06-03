@@ -1,0 +1,31 @@
+program: train.py
+method: grid
+metric:
+  name: v_n_mae
+  goal: minimize
+parameters:
+  learning_rate:
+    values: [0.001, 0.0005,0.0001, 0.00005,0.00001]
+  action:
+    distribution: categorical
+    values:
+    - BaseballPitch
+    - BasketballDunk
+    - Billiards
+    - CleanAndJerk
+    - CliffDiving
+    - CricketBowling
+    - CricketShot
+    - Diving
+    - FrisbeeCatch
+    - GolfSwing
+    - HammerThrow
+    - HighJump
+    - JavelinThrow
+    - LongJump
+    - PoleVault
+    - Shotput
+    - SoccerPenalty
+    - TennisSwing
+    - ThrowDiscus
+    - VolleyballSpiking
