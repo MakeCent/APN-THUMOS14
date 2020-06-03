@@ -22,12 +22,12 @@ now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 formal_training = True
 
 hyperparameter_defaults = dict(
-    loss='mae',
+    loss='mse',
     y_s=0,
     y_e=100,
     learning_rate=0.0001,
     batch_size=32,
-    epochs=30 if formal_training is True else 5,
+    epochs=30,
     action="BaseballPitch"
 )
 wandb.init(config=hyperparameter_defaults, name=now)
@@ -79,7 +79,7 @@ with strategy.scope():
     parallel_model.compile(loss=config.loss, optimizer=optimizer, metrics=[n_mae])
 
 # Start to train
-model_checkpoint = ModelCheckpoint(str(models_path.joinpath('{epoch:02d}-{val_n_mae:.2f}.h5')), verbose=1)
+model_checkpoint = ModelCheckpoint(str(models_path.joinpath('{epoch:02d}-{val_n_mae:.2f}.h5')), period=5)
 history = parallel_model.fit(x=train_generator, steps_per_epoch=train_steps, validation_data=test_generator,
                              validation_steps=val_steps, epochs=config.epochs, verbose=1,
                              callbacks=[model_checkpoint, wandbcb])
