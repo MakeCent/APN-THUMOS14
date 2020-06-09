@@ -5,6 +5,67 @@
 # Date  : 23/5/2019
 
 
+def read_from_annfile(root, annfile, y_range):
+    import pandas as pd
+    import numpy as np
+    temporal_annotations = pd.read_csv(annfile, header=None)
+    img_paths, labels = [], []
+    for i_r, row in temporal_annotations.iterrows():
+        action_length = row.values[2] + 1 - row.values[1]
+        img_paths.extend(["{}/{}/{}.jpg".format(root, row.values[0], str(num).zfill(5)) for num in
+                          np.arange(row.values[1], row.values[2] + 1)])
+        labels.extend(np.linspace(*y_range, num=action_length, dtype=np.float32))
+    return img_paths, labels
+
+
+def decode_img(file_path):
+    import tensorflow as tf
+    img = tf.io.read_file(file_path)
+    img = tf.image.decode_jpeg(img, channels=3)
+    img = tf.image.convert_image_dtype(img, tf.float32)
+    return img
+
+
+def build_dataset(root, annfile, y_range, target_size=(224, 224)):
+    """
+    :param root:
+    :param annfile:
+    :param y_range:
+    :param target_size:
+    :return:
+    Example:
+    root = "/mnt/louis-consistent/Datasets/THUMOS14/Validation"
+    annfile = "/mnt/louis-consistent/Datasets/THUMOS14/TH14_Temporal_annotations_validation/annotationF/HammerThrow_valF.csv"
+    y_range = (0, 100)
+    """
+    import tensorflow as tf
+    AUTOTUNE = tf.data.experimental.AUTOTUNE
+    imgs, labels = read_from_annfile(root, annfile, y_range)
+    img_ds = tf.data.Dataset.from_tensor_slices(imgs)
+    img_ds = img_ds.map(decode_img, num_parallel_calls=AUTOTUNE)
+    img_ds = img_ds.map(lambda x: tf.image.resize(x, target_size), num_parallel_calls=AUTOTUNE)
+    labels_ds = tf.data.Dataset.from_tensor_slices(labels)
+    labeled_ds = tf.data.Dataset.zip((img_ds, labels_ds))
+    return labeled_ds
+
+
+def prepare_for_training(ds, batch_size, cache=True, shuffle_buffer_size=1000):
+    import tensorflow as tf
+    AUTOTUNE = tf.data.experimental.AUTOTUNE
+    if cache:
+        if isinstance(cache, str):
+            ds = ds.cache(cache)
+        else:
+            ds = ds.cache()
+
+    ds = ds.shuffle(buffer_size=shuffle_buffer_size)
+    ds = ds.repeat()
+    ds = ds.batch(batch_size)
+    ds = ds.prefetch(buffer_size=AUTOTUNE)
+
+    return ds
+
+
 
 
 def load_trimmed_images(train_ground_truth_path, test_ground_truth_path , train_directory , test_directory, *y_range):
