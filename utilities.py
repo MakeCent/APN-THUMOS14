@@ -169,3 +169,13 @@ def save_history(path, history):
     history_pd.to_csv(path.joinpath('history.csv'), index=False)
 
 
+def lr_schedule(epoch, lr):
+    # if epoch == 20:
+    #     return lr * 0.2
+    # if epoch == 40:
+    #     return lr * 0.2
+    # else:
+        return lr
+
+
+
