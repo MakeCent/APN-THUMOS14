@@ -7,6 +7,13 @@
 # %% Special Function: Can only be used in this program. Most of them aim to make main file more concise.
 
 
+def format_data(image):
+    import tensorflow as tf
+    image = (image / 127.5) - 1
+    image = tf.image.resize(image, (224, 224))
+    return image
+
+
 def read_from_annfile(root, annfile, y_range):
     """
     According to the temporal annotation file. Create list of image paths and list of labels.
@@ -27,41 +34,36 @@ def read_from_annfile(root, annfile, y_range):
     return img_paths, labels
 
 
-def dataset_trimmed(root, annfile, y_range, target_size=(224, 224)):
+def dataset_trimmed(root, annfile, y_range):
     """
     Create tf.data.Dataset according to image paths and labels paths. This is for training
     :param root: String. Directory where all images are stored.
     :param annfile: annfile: String. Path where temporal annotation locates.
     :param y_range: Tuple. Label range.
-    :param target_size: Tuple. image size to be resized.
     :return: tf.data.Dataset. Contain all trimmed images and labels. But not prepared for training yet, need batch,
     shuffle, cache, prefetch ...
     """
     import tensorflow as tf
     imgs_list, labels_list = read_from_annfile(root, annfile, y_range)
 
-    def transfroms_func(x):
-        x = tf.image.resize(x, target_size)
+    def augment_func(x):
         x = tf.image.random_flip_left_right(x)
         return x
 
-    ds = build_dataset(imgs_list, labels_list, transform=transfroms_func)
+    ds = build_dataset(imgs_list, labels_list, transform=[format_data, augment_func])
     return ds
 
 
-def dataset_single_video(video_path, target_size=(224, 224)):
+def single_test_video(video_path, batch_size):
     """
     Used for prediction. Create tf.data.Dataset contains all images in a video path. Hence this is untrimmed.
     :param video_path: String. Path where all video images locate.
-    :param target_size: Tuple. image size to be resized.
+    :param batch_size: Int.
     :return: tf.data.Dataset. Contain all images in that given video path
     """
-    import tensorflow as tf
-    AUTOTUNE = tf.data.experimental.AUTOTUNE
     imgs_list = find_imgs(video_path)
-    ds = build_dataset(imgs_list, transform=format_data)
-    ds = ds.batch(128)
-    # ds = ds.prefetch(buffer_size=AUTOTUNE)
+    ds = build_dataset(imgs_list, transform=[format_data])
+    ds = ds.batch(batch_size)
     return ds
 
 
@@ -81,7 +83,7 @@ def build_dataset(imgs_list, labels_list=None, transform=None):
     Given image paths and labels, create tf.data.Dataset instance.
     :param imgs_list: List. Consists of strings. Each string is a path of one image.
     :param labels_list: List. Consists of labels.
-    :param transform: Function. transform function applied on images.
+    :param transform: List. transform functions applied on images.
     :return: tf.data.Dataset. if labels_list is provided, will produce a labeled dataset. Images dataset otherwise.
     """
     import tensorflow as tf
@@ -89,10 +91,13 @@ def build_dataset(imgs_list, labels_list=None, transform=None):
 
     img_ds = tf.data.Dataset.from_tensor_slices(imgs_list)
     img_ds = img_ds.map(decode_img, num_parallel_calls=AUTOTUNE)
-    ds = img_ds.map(transform, num_parallel_calls=AUTOTUNE)
+    for t in transform:
+        img_ds = img_ds.map(t, num_parallel_calls=AUTOTUNE)
     if labels_list:
         labels_ds = tf.data.Dataset.from_tensor_slices(labels_list)
-        ds = tf.data.Dataset.zip((ds, labels_ds))
+        ds = tf.data.Dataset.zip((img_ds, labels_ds))
+    else:
+        ds = img_ds
     return ds
 
 
@@ -132,9 +137,3 @@ def prepare_for_training(ds, batch_size, cache=True, shuffle_buffer_size=1000):
 
     return ds
 
-
-def format_data(image, label):
-    import tensorflow as tf
-    image = (image / 127.5) - 1
-    image = tf.image.resize(image, (224, 224))
-    return image, label
