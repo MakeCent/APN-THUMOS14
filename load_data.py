@@ -7,11 +7,14 @@
 # %% Special Function: Can only be used in this program. Most of them aim to make main file more concise.
 
 
-def format_data(image):
+def format_img(image, label=None):
     import tensorflow as tf
     image = (image / 127.5) - 1
     image = tf.image.resize(image, (224, 224))
-    return image
+    if label is None:
+        return image
+    else:
+        return image, label
 
 
 def read_from_annfile(root, annfile, y_range):
@@ -34,71 +37,50 @@ def read_from_annfile(root, annfile, y_range):
     return img_paths, labels
 
 
-def dataset_trimmed(root, annfile, y_range):
-    """
-    Create tf.data.Dataset according to image paths and labels paths. This is for training
-    :param root: String. Directory where all images are stored.
-    :param annfile: annfile: String. Path where temporal annotation locates.
-    :param y_range: Tuple. Label range.
-    :return: tf.data.Dataset. Contain all trimmed images and labels. But not prepared for training yet, need batch,
-    shuffle, cache, prefetch ...
-    """
-    import tensorflow as tf
-    imgs_list, labels_list = read_from_annfile(root, annfile, y_range)
-
-    def augment_func(x):
-        x = tf.image.random_flip_left_right(x)
-        return x
-
-    ds = build_dataset(imgs_list, labels_list, transform=[format_data, augment_func])
-    return ds
-
-
-def single_test_video(video_path, batch_size):
-    """
-    Used for prediction. Create tf.data.Dataset contains all images in a video path. Hence this is untrimmed.
-    :param video_path: String. Path where all video images locate.
-    :param batch_size: Int.
-    :return: tf.data.Dataset. Contain all images in that given video path
-    """
-    imgs_list = find_imgs(video_path)
-    ds = build_dataset(imgs_list, transform=[format_data])
-    ds = ds.batch(batch_size)
-    return ds
-
-
 # %% Basic function: Can be easily used in other programs.
 
 
-def decode_img(file_path):
+def decode_img(file_path, label=None):
+    """
+    Read image from path
+    :param label: Unknown.
+    :param file_path: String.
+    :return: Image Tensor.
+    """
     import tensorflow as tf
     img = tf.io.read_file(file_path)
     img = tf.image.decode_jpeg(img, channels=3)
-    img = tf.image.convert_image_dtype(img, tf.float32)
-    return img
+    img = tf.cast(img, tf.float32)
+    if label is None:
+        return img
+    else:
+        return img, label
 
 
-def build_dataset(imgs_list, labels_list=None, transform=None):
+def build_dataset_from_slices(imgs_list, labels_list=None, batch_size=32, augment=None, shuffle=True, prefetch=True):
     """
     Given image paths and labels, create tf.data.Dataset instance.
     :param imgs_list: List. Consists of strings. Each string is a path of one image.
-    :param labels_list: List. Consists of labels.
+    :param labels_list: List. Consists of labels. None means for only prediction
     :param transform: List. transform functions applied on images.
     :return: tf.data.Dataset. if labels_list is provided, will produce a labeled dataset. Images dataset otherwise.
     """
     import tensorflow as tf
     AUTOTUNE = tf.data.experimental.AUTOTUNE
-
-    img_ds = tf.data.Dataset.from_tensor_slices(imgs_list)
-    img_ds = img_ds.map(decode_img, num_parallel_calls=AUTOTUNE)
-    for t in transform:
-        img_ds = img_ds.map(t, num_parallel_calls=AUTOTUNE)
-    if labels_list:
-        labels_ds = tf.data.Dataset.from_tensor_slices(labels_list)
-        ds = tf.data.Dataset.zip((img_ds, labels_ds))
+    if labels_list is None:
+        dataset = tf.data.Dataset.from_tensor_slices(imgs_list)
     else:
-        ds = img_ds
-    return ds
+        dataset = tf.data.Dataset.from_tensor_slices((imgs_list, labels_list))
+    if shuffle:
+        dataset = dataset.shuffle(len(imgs_list))
+    dataset = dataset.map(decode_img, num_parallel_calls=AUTOTUNE)
+    dataset = dataset.map(format_img, num_parallel_calls=AUTOTUNE)
+    if augment:
+        dataset = dataset.map(augment, num_parallel_calls=AUTOTUNE)
+    dataset = dataset.batch(batch_size)
+    if prefetch:
+        dataset = dataset.prefetch(buffer_size=AUTOTUNE)
+    return dataset
 
 
 def find_imgs(video_path, suffix='jpg'):

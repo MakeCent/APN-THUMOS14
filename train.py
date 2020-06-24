@@ -18,7 +18,7 @@ import tensorflow as tf
 
 AUTOTUNE = tf.data.experimental.AUTOTUNE
 fix_bug()
-now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+now = datetime.datetime.now().strftime("%Y-%m-%d-%H:%M:%S")
 # %% wandb Initialization
 default_config = dict(
     loss='mse',
@@ -26,12 +26,12 @@ default_config = dict(
     y_e=100,
     learning_rate=0.0001,
     learning_rate2=0.0001,
-    batch_size=16,
+    batch_size=32,
     epochs=0,
     epochs2=30,
     action="GolfSwing"
 )
-wandb.init(config=default_config, name=now, notes='change fc layer to 64, 32, fine tune, use new train dataset')
+wandb.init(config=default_config, name=now, notes='use new train dataset, this is a baseline')
 config = wandb.config
 wandbcb = WandbCallback(monitor='val_n_mae', save_model=False)
 
@@ -60,11 +60,15 @@ history_path.mkdir(parents=True, exist_ok=True)
 models_path.mkdir(parents=True, exist_ok=True)
 
 # %% Build dataset
-datasets = {x: dataset_trimmed(root[x], annfile[x], y_range) for x in ['train', 'val']}
-ds_size = {x: tf.data.experimental.cardinality(datasets[x]).numpy() for x in ['train', 'val']}
-train_dataset = datasets['train'].cache().shuffle(15000).batch(batch_size).prefetch(buffer_size=AUTOTUNE)
-val_dataset = datasets['val'].cache().batch(batch_size).prefetch(buffer_size=AUTOTUNE)
 
+# def augment_func(x):
+#     import tensorflow as tf
+#     x = tf.image.random_flip_left_right(x)
+#     return x
+
+datalist = {x: read_from_annfile(root[x], annfile[x], y_range) for x in ['train', 'val']}
+train_dataset = build_dataset_from_slices(*datalist['train'], batch_size=batch_size)
+val_dataset = build_dataset_from_slices(*datalist['val'], batch_size=batch_size, shuffle=False)
 # %% Build and compile model
 n_mae = normalize_mae(y_range[1] - y_range[0])  # make mae loss normalized into range 0 - 100.
 strategy = tf.distribute.MirroredStrategy()
