@@ -178,4 +178,113 @@ def lr_schedule(epoch, lr):
         return lr
 
 
+def boxplot_split(split_as, split_on):
+    boxed = []
+    cuts = [(n, n+1) for n in range(100)]
+    for c in cuts:
+        boxed.append(list(split_on[(split_as > c[0]) * (split_as <= c[1])].squeeze()))
+    return boxed
 
+
+def get_boxplot(labels, n_maes):
+    import numpy as np
+    from matplotlib import pyplot as plt
+    split_for_box = boxplot_split(np.arrat(labels), np.array(n_maes))
+    plt.figure()
+    plt.boxplot(split_for_box)
+    plt.show()
+
+
+def plot_detection(video_prediction, gt, ads):
+    from matplotlib import pyplot as plt
+    import numpy as np
+    plt.figure(figsize=(15, 5))
+    plt.plot(video_prediction, '-')
+    plt.vlines(gt[:, 0], 0, 100, colors='r', linestyles='solid', label='ground truth')
+    plt.vlines(gt[:, 1], 0, 100, colors='r', linestyles='solid', label='ground truth')
+    plt.vlines(ads[:, 0], 0, 100, colors='k', linestyles='dashed', label='ground truth')
+    plt.vlines(ads[:, 1], 0, 100, colors='k', linestyles='dashed', label='ground truth')
+    plt.yticks(np.arange(0, 100, 20.0))
+    plt.xlabel('Frame Index')
+    plt.ylabel('Completeness')
+    plt.grid()
+    plt.show()
+
+
+def plot_prediction(video_prediction):
+    from matplotlib import pyplot as plt
+    import numpy as np
+    plt.figure(figsize=(15, 5))
+    plt.plot(video_prediction, '-')
+    plt.yticks(np.arange(0, 100, 20.0))
+    plt.xlabel('Frame Index')
+    plt.ylabel('Completeness')
+    plt.grid()
+    plt.show()
+
+import tensorflow as tf
+class LossCallback(tf.keras.callbacks.Callback):
+
+    def on_test_begin(self, logs=None):
+        self.n_mae = []
+        self.loss = []
+
+    def on_test_batch_end(self, batch, logs=None):
+        self.loss.append(logs['loss'])
+        self.n_mae.append(logs['n_mae'])
+
+
+def matrix_iou(gt, ads):
+    import numpy as np
+
+    def iou(a, b):
+        ov = 0
+        union = max(a[1], b[1]) - min(a[0], b[0])
+        intersection = min(a[1], b[1]) - max(a[0], a[0])
+        if intersection > 0:
+            ov = intersection/union
+        return ov
+    ov_m = np.zeros([gt.shape[0], ads.shape[0]])
+    for i in range(gt.shape[0]):
+        for j in range(ads.shape[0]):
+            ov_m[i, j] = iou(gt[i, :], ads[j, :])
+    return ov_m
+
+
+def calc_truepositive(action_detected, temporal_annotations, iou_T):
+    """
+    Give the predicted action intervals and ground truth intervals, using IoU threshold to get true positive proposals.
+    :param action_detected: Array. Shape (N, 3). Float. 1st and 2st columns contain start and ending frame indexes of detected actions.
+            3st column for confidence/loss. Here is for loss, which means tp will be sort with ascend order.
+    :param temporal_annotations: Array. Shape (M, 2). Float. 1st and 2st columns contain start and ending frame indexes of ground truthes.
+    :param iou_T: Float. IoU thredhold. A detected action can be true positive only if it has IoU larger than threhold with a ground truth.
+    :return: Array. Shape (N,). Composing 0 and 1 corresponding to each detected action, 1 means true positive.
+    """
+    import numpy as np
+    num_detection = action_detected.shape[0]
+    iou_matrix = matrix_iou(temporal_annotations, action_detected[:, :2])
+    tp = np.zeros(num_detection, dtype=np.int)
+    for r in range(iou_matrix.shape[0]):
+        max_iou = iou_matrix[r, :].max()
+        max_idx = iou_matrix[r, :].argmax()
+        if max_iou > iou_T:
+            iou_matrix[:, max_idx] = 0
+            tp[max_idx] = 1
+    return tp
+
+
+def average_precision(tp, num_gt, loss):
+    """
+    Compute average precision with given true positive indicator and number of ground truth.
+    :param tp: Array. Shape (N,). Comprising 0 and 1. Represents the T or F of proposed predictions.
+    :param num_gt: Int. Number of ground truth samples.
+    :param loss: Array. Shape (N,). loss of each predictions used for sort the tp. For using confidence, code need to be revised.
+    :return: Array. Shape (1,). Average Precision.
+    """
+    import numpy as np
+    tp = tp[loss.argsort()]
+    cum_tp = np.cumsum(tp)
+    cum_fp = np.cumsum(1-tp)
+    precisions = cum_tp / (cum_tp + cum_fp)
+    AP = np.sum(precisions*tp)/num_gt
+    return AP

@@ -29,11 +29,17 @@ def read_from_annfile(root, annfile, y_range):
     import numpy as np
     temporal_annotations = pd.read_csv(annfile, header=None)
     img_paths, labels = [], []
+
+    def generate_labels(length):
+        completeness = np.linspace(*y_range, num=length, dtype=np.float32)
+        # completeness = np.round(completeness)
+        return completeness
+
     for i_r, row in temporal_annotations.iterrows():
         action_length = row.values[2] + 1 - row.values[1]
         img_paths.extend(["{}/{}/{}.jpg".format(root, row.values[0], str(num).zfill(5)) for num in
                           np.arange(row.values[1], row.values[2] + 1)])
-        labels.extend(np.linspace(*y_range, num=action_length, dtype=np.float32))
+        labels.extend(generate_labels(action_length))
     return img_paths, labels
 
 
@@ -90,8 +96,9 @@ def find_imgs(video_path, suffix='jpg'):
     :return: List. Consists of strings. Each string is a image path; Sorted.
     """
     from pathlib import Path
-    vp = Path(video_path)
-    imgs_list = [str(jp) for jp in sorted(vp.glob('*.{}'.format(suffix)))]
+    if isinstance(video_path, str):
+        video_path = Path(video_path)
+    imgs_list = [str(jp) for jp in sorted(video_path.glob('*.{}'.format(suffix)))]
     return imgs_list
 
 

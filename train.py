@@ -47,11 +47,14 @@ action = config.action
 # %% Parameters, Configuration, and Initialization
 model_name = now
 root = {'train': "/mnt/louis-consistent/Datasets/THUMOS14/Images/Train",
-        'val': "/mnt/louis-consistent/Datasets/THUMOS14/Images/Validation"}
+        'val': "/mnt/louis-consistent/Datasets/THUMOS14/Images/Validation",
+        'test': "/mnt/louis-consistent/Datasets/THUMOS14/Images/Test"}
 annfile = {
     'train': "/mnt/louis-consistent/Datasets/THUMOS14/Annotations/train/annotationF/{}_trainF.csv".format(
         action),
     'val': "/mnt/louis-consistent/Datasets/THUMOS14/Annotations/validation/annotationF/{}_valF.csv".format(
+        action),
+    'test': "/mnt/louis-consistent/Datasets/THUMOS14/Annotations/test/annotationF/{}_testF.csv".format(
         action)}
 output_path = '/mnt/louis-consistent/Saved/THUMOS14_output'  # Directory to save model and history
 history_path = Path(output_path, action, 'History', model_name)
@@ -67,8 +70,11 @@ models_path.mkdir(parents=True, exist_ok=True)
 #     return x
 
 datalist = {x: read_from_annfile(root[x], annfile[x], y_range) for x in ['train', 'val']}
-train_dataset = build_dataset_from_slices(*datalist['train'], batch_size=batch_size)
-val_dataset = build_dataset_from_slices(*datalist['val'], batch_size=batch_size, shuffle=False)
+# train_dataset = build_dataset_from_slices(*datalist['train'], batch_size=batch_size)
+# val_dataset = build_dataset_from_slices(*datalist['val'], batch_size=batch_size, shuffle=False)
+test_dataset = build_dataset_from_slices(*datalist['test'], batch_size=1, shuffle=False)
+train_val_datalist = (datalist['train'][0]+datalist['val'][0], datalist['train'][1]+datalist['val'][1])
+train_val_dataset = build_dataset_from_slices(*train_val_datalist, batch_size=batch_size)
 # %% Build and compile model
 n_mae = normalize_mae(y_range[1] - y_range[0])  # make mae loss normalized into range 0 - 100.
 strategy = tf.distribute.MirroredStrategy()
@@ -89,13 +95,13 @@ with strategy.scope():
         # # %% Transfer Learning
         backbone.trainable = False
         model.compile(loss=loss, optimizer=tf.keras.optimizers.Adam(learning_rate), metrics=[n_mae])
-        transf_his = model.fit(train_dataset, validation_data=val_dataset, epochs=epochs,
+        transf_his = model.fit(train_val_dataset, validation_data=test_dataset, epochs=epochs,
                                callbacks=[model_checkpoint, wandbcb, lr_sche], verbose=1)
     if epochs2 > 0:
         # %% Fine tune
         backbone.trainable = True
         model.compile(loss=loss, optimizer=tf.keras.optimizers.Adam(learning_rate2), metrics=[n_mae])
-        ftune_his = model.fit(train_dataset, validation_data=val_dataset, epochs=epochs2,
+        ftune_his = model.fit(train_val_dataset, validation_data=test_dataset, epochs=epochs2,
                               callbacks=[model_checkpoint, wandbcb, lr_sche], verbose=1)
 
 # %% Save history to csv and images
