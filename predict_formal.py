@@ -17,9 +17,9 @@ annfile = "/mnt/louis-consistent/Datasets/THUMOS14/Annotations/test/annotationF/
 temporal_annotation = pd.read_csv(annfile, header=None)
 video_names = temporal_annotation.iloc[:, 0].unique()
 test_dir = "/mnt/louis-consistent/Datasets/THUMOS14/Images/Test"
-action_detected = []
+# %% Model Predict
+predictions = {}
 ground_truth = []
-tps = []
 for v in video_names:
     gt = temporal_annotation.loc[temporal_annotation.iloc[:, 0] == v].iloc[:, 1:].values
     ground_truth.append(gt)
@@ -33,13 +33,17 @@ for v in video_names:
         model = tf.keras.models.load_model(model_path, compile=False)
         model.compile(loss='mse', metrics=[n_mae])
         prediction = model.predict(ds, verbose=1)
+    predictions[v] = prediction
 
-    # %% Detect actions
-    ads = action_search(prediction, min_T=75, max_T=20, min_L=35)
+# %% Detect actions
+action_detected = []
+tps = []
+for k, prediction in predictions.items():
+    ads = action_search(prediction, min_T=65, max_T=30, min_L=35)
     ads = np.array(ads)
     action_detected.append(ads)
-    tps.append(calc_truepositive(ads, gt, 0.5))
+    tps.append(calc_truepositive(ads, ground_truth[k], 0.5))
 
 num_gt = np.vstack(ground_truth).shape[0]
-loss = np.hstack(action_detected)[:, 2]
-ap = average_precision(np.vstack(tps), num_gt, loss)
+loss = np.vstack(action_detected)[:, 2]
+ap = average_precision(np.hstack(tps), num_gt, loss)
