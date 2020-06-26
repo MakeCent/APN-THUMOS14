@@ -8,7 +8,7 @@ from load_data import *
 from utilities import *
 from pathlib import Path
 from tensorflow.keras.applications import ResNet101
-from tensorflow.keras.layers import Dense, Dropout, Activation
+from tensorflow.keras.layers import Dense, Dropout
 from tensorflow.keras import Model
 from tensorflow.keras.callbacks import ModelCheckpoint, LearningRateScheduler
 import wandb
@@ -31,7 +31,7 @@ default_config = dict(
     epochs2=30,
     action="GolfSwing"
 )
-wandb.init(config=default_config, name=now, notes='change y_s to 1')
+wandb.init(config=default_config, name=now, notes='use 10 stacked optical_flow to train')
 config = wandb.config
 wandbcb = WandbCallback(monitor='val_n_mae', save_model=False)
 
@@ -79,7 +79,6 @@ train_val_dataset = build_dataset_from_slices(*train_val_datalist, batch_size=ba
 # n_mae = normalize_mae(y_range[1] - y_range[0])  # make mae loss normalized into range 0 - 100.
 strategy = tf.distribute.MirroredStrategy()
 # Make sure all model construction and compilation is in the scope()
-
 with strategy.scope():
     inputs = tf.keras.Input(shape=(224, 224, 3))
     backbone = ResNet101(weights='imagenet', input_shape=(224, 224, 3), pooling='avg', include_top=False)
