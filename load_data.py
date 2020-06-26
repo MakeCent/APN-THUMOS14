@@ -28,30 +28,31 @@ def read_from_annfile(root, annfile, y_range, mode='rgb', stack_length=10):
     import pandas as pd
     import numpy as np
     temporal_annotations = pd.read_csv(annfile, header=None)
-    img_paths, flow_paths, labels = [], [], []
 
-    def generate_labels(length, num_levels=100):
+    def generate_labels(length):
         completeness = np.linspace(*y_range, num=length, dtype=np.float32)
-        rounded_completeness = np.round(completeness)
-        ordinal_completeness = [np.array([1]*int(c) + [0]*(num_levels-int(c))) for c in rounded_completeness]
-        return ordinal_completeness
-
-    for i_r, row in temporal_annotations.iterrows():
-        action_length = row.values[2] + 1 - row.values[1]
-        if mode == 'rgb':
-            img_paths.extend(["{}/{}/{}.jpg".format(root, row.values[0], str(num).zfill(5)) for num in
-                              np.arange(row.values[1], row.values[2] + 1)])
-        elif mode == 'flow':
-            flow_paths.append(["{}/{}/{}/{}_{}.jpg".format(root, row.values[0], d, d, str(num).zfill(5)) for num in
-                              np.arange(row.values[1], row.values[2] + 1)] for d in ['flow_x', 'flow_y'])
-        labels.extend(generate_labels(action_length))
+        # completeness = np.round(completeness)
+        return completeness
 
     if mode == 'rgb':
+        img_paths, labels = [], []
+        for i_r, row in temporal_annotations.iterrows():
+            action_length = row.values[2] + 1 - row.values[1]
+            img_paths.extend(["{}/{}/{}.jpg".format(root, row.values[0], str(num).zfill(5)) for num in
+                              np.arange(row.values[1], row.values[2] + 1)])
+            labels.extend(generate_labels(action_length))
         return img_paths, labels
+
     elif mode == 'flow':
+        flow_paths, labels = [], []
+        for i_r, row in temporal_annotations.iterrows():
+            flow_paths.append(["{}/{}/{}/{}_{}.jpg".format(root, row.values[0], d, d, str(num).zfill(5)) for num in
+                               np.arange(row.values[1], row.values[2] + 1) for d in ['flow_x', 'flow_y']])
         stacked_flow_list = []
         for v_fl in flow_paths:
-            stacked_flow_list.extend([v_fl[i:i+stack_length*2] for i in range(0, (len(v_fl) - stack_length - 1)//2, 2)])
+            v_stacked_flow = [v_fl[2*i:2*i+stack_length*2] for i in range(0, len(v_fl)//2 - stack_length + 1)]
+            labels.extend(generate_labels(len(v_stacked_flow)))
+            stacked_flow_list.extend(v_stacked_flow)
         return stacked_flow_list, labels
 
 
@@ -112,13 +113,16 @@ def stack_optical_flow(flow_list, labels_list=None, batch_size=32, augment=None,
         dataset = dataset.shuffle(len(flow_list))
 
     def stack_decode_format(filepath_list, labels=None):
+        filepath_list = tf.unstack(filepath_list, axis=-1)
         flow_snip = []
-        for filepath in filepath_list:
-            decoded_flow = decode_img(filepath)
-            formated_flow = format_img(decoded_flow)
-            flow_snip.append(formated_flow)
-        stacked_flows = tf.concat(flow_snip, axis=-1)
-        return stacked_flows, labels
+        for flow_path in filepath_list:
+            decoded = decode_img(flow_path)
+            flow_snip.append(format_img(decoded))
+        parsed = tf.concat(flow_snip, axis=-1)
+        if labels is None:
+            return parsed
+        else:
+            return parsed, labels
 
     dataset = dataset.map(stack_decode_format, num_parallel_calls=AUTOTUNE)
     if augment:
