@@ -17,7 +17,7 @@ def format_img(image, label=None):
         return image, label
 
 
-def read_from_annfile(root, annfile, y_range):
+def read_from_annfile(root, annfile, y_range, mode='rgb', stack_length=10):
     """
     According to the temporal annotation file. Create list of image paths and list of labels.
     :param root: String. Directory where all images are stored.
@@ -28,7 +28,7 @@ def read_from_annfile(root, annfile, y_range):
     import pandas as pd
     import numpy as np
     temporal_annotations = pd.read_csv(annfile, header=None)
-    img_paths, labels = [], []
+    img_paths, flow_paths, labels = [], [], []
 
     def generate_labels(length):
         completeness = np.linspace(*y_range, num=length, dtype=np.float32)
@@ -37,10 +37,21 @@ def read_from_annfile(root, annfile, y_range):
 
     for i_r, row in temporal_annotations.iterrows():
         action_length = row.values[2] + 1 - row.values[1]
-        img_paths.extend(["{}/{}/{}.jpg".format(root, row.values[0], str(num).zfill(5)) for num in
-                          np.arange(row.values[1], row.values[2] + 1)])
+        if mode == 'rgb':
+            img_paths.extend(["{}/{}/{}.jpg".format(root, row.values[0], str(num).zfill(5)) for num in
+                              np.arange(row.values[1], row.values[2] + 1)])
+        elif mode == 'flow':
+            flow_paths.append(["{}/{}/{}/{}_{}.jpg".format(root, row.values[0], d, d, str(num).zfill(5)) for num in
+                              np.arange(row.values[1], row.values[2] + 1)] for d in ['flow_x', 'flow_y'])
         labels.extend(generate_labels(action_length))
-    return img_paths, labels
+
+    if mode == 'rgb':
+        return img_paths, labels
+    elif mode == 'flow':
+        stacked_flow_list = []
+        for v_fl in flow_paths:
+            stacked_flow_list.extend([v_fl[i:i+stack_length*2] for i in range(0, (len(v_fl) - stack_length - 1)//2, 2)])
+        return stacked_flow_list, labels
 
 
 # %% Basic function: Can be easily used in other programs.
@@ -55,7 +66,7 @@ def decode_img(file_path, label=None):
     """
     import tensorflow as tf
     img = tf.io.read_file(file_path)
-    img = tf.image.decode_jpeg(img, channels=3)
+    img = tf.image.decode_jpeg(img)
     img = tf.cast(img, tf.float32)
     if label is None:
         return img
@@ -63,10 +74,10 @@ def decode_img(file_path, label=None):
         return img, label
 
 
-def build_dataset_from_slices(imgs_list, labels_list=None, batch_size=32, augment=None, shuffle=True, prefetch=True):
+def build_dataset_from_slices(data_list, labels_list=None, batch_size=32, augment=None, shuffle=True, prefetch=True):
     """
     Given image paths and labels, create tf.data.Dataset instance.
-    :param imgs_list: List. Consists of strings. Each string is a path of one image.
+    :param data_list: List. Consists of strings. Each string is a path of one image.
     :param labels_list: List. Consists of labels. None means for only prediction
     :param transform: List. transform functions applied on images.
     :return: tf.data.Dataset. if labels_list is provided, will produce a labeled dataset. Images dataset otherwise.
@@ -74,13 +85,41 @@ def build_dataset_from_slices(imgs_list, labels_list=None, batch_size=32, augmen
     import tensorflow as tf
     AUTOTUNE = tf.data.experimental.AUTOTUNE
     if labels_list is None:
-        dataset = tf.data.Dataset.from_tensor_slices(imgs_list)
+        dataset = tf.data.Dataset.from_tensor_slices(data_list)
     else:
-        dataset = tf.data.Dataset.from_tensor_slices((imgs_list, labels_list))
+        dataset = tf.data.Dataset.from_tensor_slices((data_list, labels_list))
     if shuffle:
-        dataset = dataset.shuffle(len(imgs_list))
+        dataset = dataset.shuffle(len(data_list))
     dataset = dataset.map(decode_img, num_parallel_calls=AUTOTUNE)
     dataset = dataset.map(format_img, num_parallel_calls=AUTOTUNE)
+    if augment:
+        dataset = dataset.map(augment, num_parallel_calls=AUTOTUNE)
+    dataset = dataset.batch(batch_size)
+    if prefetch:
+        dataset = dataset.prefetch(buffer_size=AUTOTUNE)
+    return dataset
+
+
+def stack_optical_flow(flow_list, labels_list=None, batch_size=32, augment=None, shuffle=True, prefetch=True):
+    import tensorflow as tf
+    AUTOTUNE = tf.data.experimental.AUTOTUNE
+    if labels_list is None:
+        dataset = tf.data.Dataset.from_tensor_slices(flow_list)
+    else:
+        dataset = tf.data.Dataset.from_tensor_slices((flow_list, labels_list))
+    if shuffle:
+        dataset = dataset.shuffle(len(flow_list))
+
+    def stack_decode_format(filepath_list, labels=None):
+        flow_snip = []
+        for filepath in filepath_list:
+            decoded_flow = decode_img(filepath)
+            formated_flow = format_img(decoded_flow)
+            flow_snip.append(formated_flow)
+        stacked_flows = tf.concat(flow_snip, axis=-1)
+        return stacked_flows, labels
+
+    dataset = dataset.map(stack_decode_format, num_parallel_calls=AUTOTUNE)
     if augment:
         dataset = dataset.map(augment, num_parallel_calls=AUTOTUNE)
     dataset = dataset.batch(batch_size)
@@ -125,4 +164,3 @@ def prepare_for_training(ds, batch_size, cache=True, shuffle_buffer_size=1000):
     ds = ds.prefetch(buffer_size=AUTOTUNE)
 
     return ds
-

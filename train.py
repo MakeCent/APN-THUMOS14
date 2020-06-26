@@ -31,7 +31,7 @@ default_config = dict(
     epochs2=30,
     action="GolfSwing"
 )
-wandb.init(config=default_config, name=now, notes='use new train dataset, this is a baseline')
+wandb.init(config=default_config, name=now, notes='use 10 stacked optical_flow to train')
 config = wandb.config
 wandbcb = WandbCallback(monitor='val_n_mae', save_model=False)
 
@@ -69,7 +69,7 @@ models_path.mkdir(parents=True, exist_ok=True)
 #     x = tf.image.random_flip_left_right(x)
 #     return x
 
-datalist = {x: read_from_annfile(root[x], annfile[x], y_range) for x in ['train', 'val']}
+datalist = {x: read_from_annfile(root[x], annfile[x], y_range) for x in ['train', 'val', 'test']}
 # train_dataset = build_dataset_from_slices(*datalist['train'], batch_size=batch_size)
 # val_dataset = build_dataset_from_slices(*datalist['val'], batch_size=batch_size, shuffle=False)
 test_dataset = build_dataset_from_slices(*datalist['test'], batch_size=1, shuffle=False)
