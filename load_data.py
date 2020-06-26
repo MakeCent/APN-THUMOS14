@@ -30,10 +30,11 @@ def read_from_annfile(root, annfile, y_range):
     temporal_annotations = pd.read_csv(annfile, header=None)
     img_paths, labels = [], []
 
-    def generate_labels(length):
+    def generate_labels(length, num_levels=100):
         completeness = np.linspace(*y_range, num=length, dtype=np.float32)
-        # completeness = np.round(completeness)
-        return completeness
+        rounded_completeness = np.round(completeness)
+        ordinal_completeness = [np.array([1]*int(c) + [0]*(num_levels-int(c))) for c in rounded_completeness]
+        return ordinal_completeness
 
     for i_r, row in temporal_annotations.iterrows():
         action_length = row.values[2] + 1 - row.values[1]
@@ -125,4 +126,3 @@ def prepare_for_training(ds, batch_size, cache=True, shuffle_buffer_size=1000):
     ds = ds.prefetch(buffer_size=AUTOTUNE)
 
     return ds
-

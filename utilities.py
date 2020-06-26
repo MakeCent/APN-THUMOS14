@@ -234,6 +234,26 @@ class LossCallback(tf.keras.callbacks.Callback):
         self.n_mae.append(logs['n_mae'])
 
 
+class BiasLayer(tf.keras.layers.Layer):
+    def __init__(self, units, *args, **kwargs):
+        super(BiasLayer, self).__init__(*args, **kwargs)
+        self.units = units
+
+    def build(self, input_shape):
+        self.bias = self.add_weight('bias',
+                                    shape=self.units,
+                                    initializer='zeros',
+                                    trainable=True)
+
+    def get_config(self):
+        config = super().get_config().copy()
+        config.update({'units': self.units,})
+        return config
+
+    def call(self, input):
+        return input + self.bias
+
+
 def matrix_iou(gt, ads):
     import numpy as np
 
@@ -288,3 +308,11 @@ def average_precision(tp, num_gt, loss):
     precisions = cum_tp / (cum_tp + cum_fp)
     AP = np.sum(precisions*tp)/num_gt
     return AP
+
+
+def mae_od(y_true, y_pred):
+    import tensorflow as tf
+    predict_completeness = tf.math.count_nonzero(y_pred > 0.5, axis=-1)
+    true_completeness = tf.math.count_nonzero(y_true > 0.5, axis=-1)
+    mean_absolute_error = tf.math.reduce_mean(tf.math.abs(predict_completeness - true_completeness), axis=-1)
+    return mean_absolute_error
