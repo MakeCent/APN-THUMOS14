@@ -46,9 +46,9 @@ action = config.action
 
 # %% Parameters, Configuration, and Initialization
 model_name = now
-root = {'train': "/mnt/louis-consistent/Datasets/THUMOS14/Images/Train",
-        'val': "/mnt/louis-consistent/Datasets/THUMOS14/Images/Validation",
-        'test': "/mnt/louis-consistent/Datasets/THUMOS14/Images/Test"}
+root = {'train': "/mnt/louis-consistent/Datasets/THUMOS14/OpticalFlows/Train",
+        'val': "/mnt/louis-consistent/Datasets/THUMOS14/OpticalFlows/Validation",
+        'test': "/mnt/louis-consistent/Datasets/THUMOS14/OpticalFlows/Test"}
 annfile = {
     'train': "/mnt/louis-consistent/Datasets/THUMOS14/Annotations/train/annotationF/{}_trainF.csv".format(
         action),

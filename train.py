@@ -28,10 +28,10 @@ default_config = dict(
     learning_rate2=0.0001,
     batch_size=32,
     epochs=0,
-    epochs2=30,
+    epochs2=50,
     action="GolfSwing"
 )
-wandb.init(config=default_config, name=now, notes='use 10 stacked optical_flow to train')
+wandb.init(config=default_config, name=now, notes='change y_s to 1, add a fc2 layer, extend epoch to 50')
 config = wandb.config
 wandbcb = WandbCallback(monitor='val_n_mae', save_model=False)
 
@@ -70,8 +70,6 @@ models_path.mkdir(parents=True, exist_ok=True)
 #     return x
 
 datalist = {x: read_from_annfile(root[x], annfile[x], y_range) for x in ['train', 'val', 'test']}
-# train_dataset = build_dataset_from_slices(*datalist['train'], batch_size=batch_size)
-# val_dataset = build_dataset_from_slices(*datalist['val'], batch_size=batch_size, shuffle=False)
 test_dataset = build_dataset_from_slices(*datalist['test'], batch_size=batch_size, shuffle=False)
 train_val_datalist = (datalist['train'][0]+datalist['val'][0], datalist['train'][1]+datalist['val'][1])
 train_val_dataset = build_dataset_from_slices(*train_val_datalist, batch_size=batch_size)
@@ -84,6 +82,8 @@ with strategy.scope():
     backbone = ResNet101(weights='imagenet', input_shape=(224, 224, 3), pooling='avg', include_top=False)
     x = backbone(inputs)
     x = Dense(1024, activation='relu', kernel_initializer='he_uniform')(x)
+    x = Dropout(0.5)(x)
+    x = Dense(256, activation='relu', kernel_initializer='he_uniform')(x)
     x = Dropout(0.5)(x)
     x = Dense(1, kernel_initializer='he_uniform', use_bias=False)(x)
     # x = Dense(64, activation='relu', kernel_initializer='he_uniform')(x)
