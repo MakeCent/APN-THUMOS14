@@ -151,6 +151,22 @@ def find_imgs(video_path, suffix='jpg'):
     return imgs_list
 
 
+def find_flows(video_path, suffix='jpg', stack_length=10):
+    """
+    Find all images in a given path.
+    :param video_path: String. Target video folder
+    :return: List. Consists of strings. Each string is a image path; Sorted.
+    """
+    from pathlib import Path
+    if isinstance(video_path, str):
+        video_path = Path(video_path)
+    flow_x = sorted(video_path.glob('flow_x/*.{}'.format(suffix)))
+    flow_y = sorted(video_path.glob('flow_y/*.{}'.format(suffix)))
+    v_fl = [e for xy in zip(flow_x, flow_y) for e in xy]
+    v_stacked_flow = [v_fl[2*i:2*i+stack_length*2] for i in range(0, len(v_fl)//2 - stack_length + 1)]
+    return v_stacked_flow
+
+
 def prepare_for_training(ds, batch_size, cache=True, shuffle_buffer_size=1000):
     """
     Given a tf.data.Dataset that contain all data but has not been prepared for training. This do preparation for it.

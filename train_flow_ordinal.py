@@ -100,6 +100,7 @@ plot_history(history_path, history)
 
 # %% Prediction on untrimmed videos
 import pandas as pd
+import numpy as np
 temporal_annotation = pd.read_csv(annfile['test'], header=None)
 video_names = temporal_annotation.iloc[:, 0].unique()
 predictions = {}
@@ -109,15 +110,14 @@ for v in video_names:
     ground_truth.append(gt)
 
     video_path = Path(root['test'], v)
-    img_list = find_imgs(video_path)
-    ds = build_dataset_from_slices(img_list, batch_size=1, shuffle=False)
+    flow_list = find_flows(video_path)
+    ds = stack_optical_flow(flow_list, batch_size=1, shuffle=False)
     strategy = tf.distribute.MirroredStrategy()
     with strategy.scope():
         prediction = model.predict(ds, verbose=1)
-    predictions[v] = prediction
+    predictions[v] = np.array([ordinal2completeness(p) for p in prediction])
 
 # %% Detect actions
-import numpy as np
 from action_detection import action_search
 action_detected = []
 tps = []

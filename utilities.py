@@ -316,3 +316,9 @@ def mae_od(y_true, y_pred):
     true_completeness = tf.math.count_nonzero(y_true > 0.5, axis=-1)
     mean_absolute_error = tf.math.reduce_mean(tf.math.abs(predict_completeness - true_completeness), axis=-1)
     return mean_absolute_error
+
+
+def ordinal2completeness(array):
+    import numpy as np
+    completeness = np.count_nonzero(array)
+    return
