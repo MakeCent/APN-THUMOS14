@@ -109,3 +109,36 @@ history = ftune_his.history
 save_history(history_path, history)
 plot_history(history_path, history)
 
+# %% Prediction on untrimmed videos
+import pandas as pd
+temporal_annotation = pd.read_csv(annfile['test'], header=None)
+video_names = temporal_annotation.iloc[:, 0].unique()
+predictions = {}
+ground_truth = []
+for v in video_names:
+    gt = temporal_annotation.loc[temporal_annotation.iloc[:, 0] == v].iloc[:, 1:].values
+    ground_truth.append(gt)
+
+    video_path = Path(root['test'], v)
+    img_list = find_imgs(video_path)
+    ds = build_dataset_from_slices(img_list, batch_size=1, shuffle=False)
+    strategy = tf.distribute.MirroredStrategy()
+    n_mae = normalize_mae(100)  # make mae loss normalized into range 0 - 100.
+    with strategy.scope():
+        prediction = model.predict(ds, verbose=1)
+    predictions[v] = prediction
+
+# %% Detect actions
+import numpy as np
+from action_detection import action_search
+action_detected = []
+tps = []
+for k, prediction in predictions.items():
+    ads = action_search(prediction, min_T=65, max_T=30, min_L=35)
+    ads = np.array(ads)
+    action_detected.append(ads)
+    tps.append(calc_truepositive(ads, ground_truth[k], 0.5))
+
+num_gt = np.vstack(ground_truth).shape[0]
+loss = np.vstack(action_detected)[:, 2]
+ap = average_precision(np.hstack(tps), num_gt, loss)
