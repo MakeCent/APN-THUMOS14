@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 # -*- coding: utf-8 -*-
-# File  : Train.py.py
+# File  : train.py
 # Author: Chongkai LU
 # Date  : 3/29/2020
 
@@ -15,7 +15,8 @@ import wandb
 from wandb.keras import WandbCallback
 import datetime
 import tensorflow as tf
-
+import socket
+agent = socket.gethostname()
 AUTOTUNE = tf.data.experimental.AUTOTUNE
 fix_bug()
 now = datetime.datetime.now().strftime("%Y-%m-%d-%H:%M:%S")
@@ -27,7 +28,8 @@ default_config = dict(
     learning_rate=0.0001,
     batch_size=32,
     epochs=30,
-    action="GolfSwing"
+    action="GolfSwing",
+    agent=agent
 )
 wandb.init(config=default_config, name=now, notes='use 10 stacked optical_flow to train, mse loss')
 config = wandb.config

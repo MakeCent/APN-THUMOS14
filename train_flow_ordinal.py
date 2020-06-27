@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 # -*- coding: utf-8 -*-
-# File  : Train.py.py
+# File  : train.py
 # Author: Chongkai LU
 # Date  : 3/29/2020
 
@@ -15,7 +15,8 @@ import wandb
 from wandb.keras import WandbCallback
 import datetime
 import tensorflow as tf
-
+import socket
+agent = socket.gethostname()
 AUTOTUNE = tf.data.experimental.AUTOTUNE
 fix_bug()
 now = datetime.datetime.now().strftime("%Y-%m-%d-%H:%M:%S")
@@ -29,9 +30,10 @@ default_config = dict(
     batch_size=32,
     epochs=0,
     epochs2=50,
-    action="GolfSwing"
+    action="GolfSwing",
+    agent=agent
 )
-wandb.init(config=default_config, name=now, notes='change y_s to 1, add a fc2 layer, extend epoch to 50')
+wandb.init(config=default_config, name=now, notes='train with flow and ordinal regression')
 config = wandb.config
 wandbcb = WandbCallback(monitor='val_n_mae', save_model=False)
 

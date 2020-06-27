@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 # -*- coding: utf-8 -*-
-# File  : Train.py.py
+# File  : train.py
 # Author: Chongkai LU
 # Date  : 3/29/2020
 
@@ -15,7 +15,8 @@ import wandb
 from wandb.keras import WandbCallback
 import datetime
 import tensorflow as tf
-
+import socket
+agent = socket.gethostname()
 AUTOTUNE = tf.data.experimental.AUTOTUNE
 fix_bug()
 now = datetime.datetime.now().strftime("%Y-%m-%d-%H:%M:%S")
@@ -29,7 +30,8 @@ default_config = dict(
     batch_size=32,
     epochs=0,
     epochs2=30,
-    action="GolfSwing"
+    action="GolfSwing",
+    agent=agent
 )
 wandb.init(config=default_config, name=now, notes='no ordinal no flow, y start from 10')
 config = wandb.config
@@ -46,9 +48,9 @@ action = config.action
 
 # %% Parameters, Configuration, and Initialization
 model_name = now
-root = {'train': "/mnt/louis-consistent/Datasets/THUMOS14/Images/Train",
-        'val': "/mnt/louis-consistent/Datasets/THUMOS14/Images/Validation",
-        'test': "/mnt/louis-consistent/Datasets/THUMOS14/Images/Test"}
+root = {'train': "/mnt/louis-consistent/Datasets/THUMOS14/Images/train",
+        'val': "/mnt/louis-consistent/Datasets/THUMOS14/Images/validation",
+        'test': "/mnt/louis-consistent/Datasets/THUMOS14/Images/test"}
 annfile = {
     'train': "/mnt/louis-consistent/Datasets/THUMOS14/Annotations/train/annotationF/{}_trainF.csv".format(
         action),

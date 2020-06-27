@@ -151,7 +151,7 @@ def plot_history(path, history, keys=None):
         plt.figure(figsize=(15, 5))
         if 'val' in key:
             continue
-        train = plt.plot(history[key], label='Train ' + key.title())
+        train = plt.plot(history[key], label='train ' + key.title())
         if 'val_{}'.format(key) in history:
             plt.plot(history['val_{}'.format(key)], '--', color=train[0].get_color(), label='Val ' + key.title())
         plt.legend()
