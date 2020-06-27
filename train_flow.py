@@ -26,10 +26,10 @@ default_config = dict(
     y_e=100,
     learning_rate=0.0001,
     batch_size=32,
-    epochs=0,
+    epochs=30,
     action="GolfSwing"
 )
-wandb.init(config=default_config, name=now, notes='use 10 stacked optical_flow to train')
+wandb.init(config=default_config, name=now, notes='use 10 stacked optical_flow to train, mse loss')
 config = wandb.config
 wandbcb = WandbCallback(monitor='val_n_mae', save_model=False)
 
@@ -42,9 +42,9 @@ action = config.action
 
 # %% Parameters, Configuration, and Initialization
 model_name = now
-root = {'train': "/mnt/louis-consistent/Datasets/THUMOS14/OpticalFlows/Train",
-        'val': "/mnt/louis-consistent/Datasets/THUMOS14/OpticalFlows/Validation",
-        'test': "/mnt/louis-consistent/Datasets/THUMOS14/OpticalFlows/Test"}
+root = {'train': "/mnt/louis-consistent/Datasets/THUMOS14/OpticalFlows/train",
+        'val': "/mnt/louis-consistent/Datasets/THUMOS14/OpticalFlows/validation",
+        'test': "/mnt/louis-consistent/Datasets/THUMOS14/OpticalFlows/test"}
 annfile = {
     'train': "/mnt/louis-consistent/Datasets/THUMOS14/Annotations/train/annotationF/{}_trainF.csv".format(
         action),

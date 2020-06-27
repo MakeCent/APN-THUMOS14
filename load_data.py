@@ -46,8 +46,8 @@ def read_from_annfile(root, annfile, y_range, mode='rgb', stack_length=10):
     elif mode == 'flow':
         flow_paths, labels = [], []
         for i_r, row in temporal_annotations.iterrows():
-            flow_paths.append(["{}/{}/{}/{}_{}.jpg".format(root, row.values[0], d, d, str(num).zfill(5)) for num in
-                               np.arange(row.values[1], row.values[2] + 1) for d in ['flow_x', 'flow_y']])
+            flow_paths.append(["{}/{}/{}/{}_{}.jpg".format(root, row.values[0], d, d, str(num+1).zfill(5)) for num in
+                               np.arange(row.values[1], row.values[2]) for d in ['flow_x', 'flow_y']])
         stacked_flow_list = []
         for v_fl in flow_paths:
             v_stacked_flow = [v_fl[2*i:2*i+stack_length*2] for i in range(0, len(v_fl)//2 - stack_length + 1)]
