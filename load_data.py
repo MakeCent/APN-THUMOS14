@@ -34,7 +34,7 @@ def read_from_annfile(root, annfile, y_range, mode='rgb', orinal=False, stack_le
         completeness = np.linspace(*y_range, num=length, dtype=np.float32)
         if orinal:
             rounded_completeness = np.round(completeness)
-            ordinal_completeness = np.array([[1]*int(c) + [0]*int(y_nums-c) for c in rounded_completeness])
+            ordinal_completeness = np.array([[1]*int(c) + [0]*int(y_nums-c) for c in rounded_completeness], dtype=np.float32)
             return ordinal_completeness
         else:
             return completeness
@@ -162,7 +162,7 @@ def find_flows(video_path, suffix='jpg', stack_length=10):
         video_path = Path(video_path)
     flow_x = sorted(video_path.glob('flow_x/*.{}'.format(suffix)))
     flow_y = sorted(video_path.glob('flow_y/*.{}'.format(suffix)))
-    v_fl = [e for xy in zip(flow_x, flow_y) for e in xy]
+    v_fl = [str(e) for xy in zip(flow_x, flow_y) for e in xy]
     v_stacked_flow = [v_fl[2*i:2*i+stack_length*2] for i in range(0, len(v_fl)//2 - stack_length + 1)]
     return v_stacked_flow
 

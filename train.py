@@ -26,10 +26,8 @@ default_config = dict(
     y_s=1,
     y_e=100,
     learning_rate=0.0001,
-    learning_rate2=0.0001,
     batch_size=32,
     epochs=0,
-    epochs2=30,
     action="GolfSwing",
     agent=agent
 )
@@ -41,10 +39,8 @@ loss = config.loss
 y_range = (config.y_s, config.y_e)
 y_nums = y_range[1] - y_range[0]
 learning_rate = config.learning_rate
-learning_rate2 = config.learning_rate2
 batch_size = config.batch_size
 epochs = config.epochs
-epochs2 = config.epochs2
 action = config.action
 
 # %% Parameters, Configuration, and Initialization
@@ -73,7 +69,7 @@ models_path.mkdir(parents=True, exist_ok=True)
 #     return x, y
 
 datalist = {x: read_from_annfile(root[x], annfile[x], y_range) for x in ['train', 'val', 'test']}
-test_dataset = build_dataset_from_slices(*datalist['test'], batch_size=1, shuffle=False)
+test_dataset = build_dataset_from_slices(*datalist['test'], batch_size=batch_size, shuffle=False)
 train_val_datalist = (datalist['train'][0]+datalist['val'][0], datalist['train'][1]+datalist['val'][1])
 train_val_dataset = build_dataset_from_slices(*train_val_datalist, batch_size=batch_size, augment=None)
 
@@ -92,18 +88,11 @@ with strategy.scope():
     model = Model(inputs, output)
     model_checkpoint = ModelCheckpoint(str(models_path.joinpath('{epoch:02d}-{val_n_mae:.2f}.h5')), period=5)
     lr_sche = LearningRateScheduler(lr_schedule)
-    if epochs > 0:
-        # # %% Transfer Learning
-        backbone.trainable = False
-        model.compile(loss=loss, optimizer=tf.keras.optimizers.Adam(learning_rate), metrics=[n_mae])
-        transf_his = model.fit(train_val_dataset, validation_data=test_dataset, epochs=epochs,
-                               callbacks=[model_checkpoint, wandbcb, lr_sche], verbose=1)
-    if epochs2 > 0:
-        # %% Fine tune
-        backbone.trainable = True
-        model.compile(loss=loss, optimizer=tf.keras.optimizers.Adam(learning_rate2), metrics=[n_mae])
-        ftune_his = model.fit(train_val_dataset, validation_data=test_dataset, epochs=epochs2,
-                              callbacks=[model_checkpoint, wandbcb, lr_sche], verbose=1)
+    # %% Fine tune
+    backbone.trainable = True
+    model.compile(loss=loss, optimizer=tf.keras.optimizers.Adam(learning_rate), metrics=[n_mae])
+    ftune_his = model.fit(train_val_dataset, validation_data=test_dataset, epochs=epochs,
+                          callbacks=[model_checkpoint, wandbcb, lr_sche], verbose=1)
 
 # %% Save history to csv and images
 history = ftune_his.history
