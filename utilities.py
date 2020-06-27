@@ -90,11 +90,11 @@ def build_datagenerators(data_paths, labels, preprocess_input, **kwargs):
     return data_generator
 
 
-def normalize_mae(y_range):
+def normalize_mae(y_nums):
     """
     Calculate MAE loss and normalize it to range 0 to 100.
-    :param y_range:
-        Float. The original MAE range length.
+    :param y_nums:
+        Float. The original MAE length.
     :return:
         Function. Used as a loss function for keras. While it returns normalized mae loss.
     """
@@ -102,7 +102,7 @@ def normalize_mae(y_range):
 
     def n_mae(*args, **kwargs):
         mae = mean_absolute_error(*args, **kwargs)
-        return mae / y_range * 100.0
+        return mae / (y_nums - 1) * 100.0
 
     return n_mae
 

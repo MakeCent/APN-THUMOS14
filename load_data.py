@@ -17,7 +17,7 @@ def format_img(image, label=None):
         return image, label
 
 
-def read_from_annfile(root, annfile, y_range, mode='rgb', stack_length=10):
+def read_from_annfile(root, annfile, y_range, mode='rgb', orinal=False, stack_length=10):
     """
     According to the temporal annotation file. Create list of image paths and list of labels.
     :param root: String. Directory where all images are stored.
@@ -28,11 +28,16 @@ def read_from_annfile(root, annfile, y_range, mode='rgb', stack_length=10):
     import pandas as pd
     import numpy as np
     temporal_annotations = pd.read_csv(annfile, header=None)
+    y_nums = y_range[1] - y_range[0] + 1
 
     def generate_labels(length):
         completeness = np.linspace(*y_range, num=length, dtype=np.float32)
-        # completeness = np.round(completeness)
-        return completeness
+        if orinal:
+            rounded_completeness = np.round(completeness)
+            ordinal_completeness = np.array([[1]*int(c) + [0]*int(y_nums-c) for c in rounded_completeness])
+            return ordinal_completeness
+        else:
+            return completeness
 
     if mode == 'rgb':
         img_paths, labels = [], []

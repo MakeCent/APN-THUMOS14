@@ -39,6 +39,7 @@ wandbcb = WandbCallback(monitor='val_n_mae', save_model=False)
 
 loss = config.loss
 y_range = (config.y_s, config.y_e)
+y_nums = y_range[1] - y_range[0] + 1
 learning_rate = config.learning_rate
 learning_rate2 = config.learning_rate2
 batch_size = config.batch_size
@@ -66,7 +67,7 @@ models_path.mkdir(parents=True, exist_ok=True)
 
 # %% Build dataset
 
-datalist = {x: read_from_annfile(root[x], annfile[x], y_range, mode='flow') for x in ['train', 'val', 'test']}
+datalist = {x: read_from_annfile(root[x], annfile[x], y_range, mode='flow', orinal=True) for x in ['train', 'val', 'test']}
 test_dataset = stack_optical_flow(*datalist['test'], batch_size=1, shuffle=False)
 train_val_datalist = (datalist['train'][0]+datalist['val'][0], datalist['train'][1]+datalist['val'][1])
 train_val_dataset = stack_optical_flow(*train_val_datalist, batch_size=batch_size)
@@ -74,14 +75,14 @@ train_val_dataset = stack_optical_flow(*train_val_datalist, batch_size=batch_siz
 strategy = tf.distribute.MirroredStrategy()
 with strategy.scope():
     inputs = tf.keras.Input(shape=(224, 224, 20))
-    backbone = ResNet101(weights='imagenet', input_shape=(224, 224, 20), pooling='avg', include_top=False)
+    backbone = ResNet101(weights=None, input_shape=(224, 224, 20), pooling='avg', include_top=False)
     x = backbone(inputs)
     x = Dense(1024, activation='relu', kernel_initializer='he_uniform')(x)
     x = Dropout(0.5)(x)
     x = Dense(256, activation='relu', kernel_initializer='he_uniform')(x)
     x = Dropout(0.5)(x)
     x = Dense(1, kernel_initializer='he_uniform', use_bias=False)(x)
-    x = BiasLayer(100)(x)
+    x = BiasLayer(y_nums)(x)
     output = Activation('sigmoid')(x)
     model = Model(inputs, output)
     model_checkpoint = ModelCheckpoint(str(models_path.joinpath('{epoch:02d}-{val_mae_od:.2f}.h5')), period=5)
@@ -111,7 +112,6 @@ for v in video_names:
     img_list = find_imgs(video_path)
     ds = build_dataset_from_slices(img_list, batch_size=1, shuffle=False)
     strategy = tf.distribute.MirroredStrategy()
-    n_mae = normalize_mae(100)  # make mae loss normalized into range 0 - 100.
     with strategy.scope():
         prediction = model.predict(ds, verbose=1)
     predictions[v] = prediction

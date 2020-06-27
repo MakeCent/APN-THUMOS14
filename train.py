@@ -23,7 +23,7 @@ now = datetime.datetime.now().strftime("%Y-%m-%d-%H:%M:%S")
 # %% wandb Initialization
 default_config = dict(
     loss='mse',
-    y_s=10,
+    y_s=1,
     y_e=100,
     learning_rate=0.0001,
     learning_rate2=0.0001,
@@ -39,6 +39,7 @@ wandbcb = WandbCallback(monitor='val_n_mae', save_model=False)
 
 loss = config.loss
 y_range = (config.y_s, config.y_e)
+y_nums = y_range[1] - y_range[0]
 learning_rate = config.learning_rate
 learning_rate2 = config.learning_rate2
 batch_size = config.batch_size
@@ -77,9 +78,8 @@ train_val_datalist = (datalist['train'][0]+datalist['val'][0], datalist['train']
 train_val_dataset = build_dataset_from_slices(*train_val_datalist, batch_size=batch_size, augment=None)
 
 # %% Build and compile model
-n_mae = normalize_mae(y_range[1] - y_range[0])  # make mae loss normalized into range 0 - 100.
+n_mae = normalize_mae(y_nums)  # make mae loss normalized into range 0 - 100.
 strategy = tf.distribute.MirroredStrategy()
-# Make sure all model construction and compilation is in the scope()
 with strategy.scope():
     inputs = tf.keras.Input(shape=(224, 224, 3))
     backbone = ResNet101(weights=None, input_shape=(224, 224, 3), pooling='avg', include_top=False)
@@ -124,7 +124,6 @@ for v in video_names:
     img_list = find_imgs(video_path)
     ds = build_dataset_from_slices(img_list, batch_size=1, shuffle=False)
     strategy = tf.distribute.MirroredStrategy()
-    n_mae = normalize_mae(100)  # make mae loss normalized into range 0 - 100.
     with strategy.scope():
         prediction = model.predict(ds, verbose=1)
     predictions[v] = prediction

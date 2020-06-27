@@ -23,7 +23,7 @@ now = datetime.datetime.now().strftime("%Y-%m-%d-%H:%M:%S")
 # %% wandb Initialization
 default_config = dict(
     loss='mse',
-    y_s=0,
+    y_s=1,
     y_e=100,
     learning_rate=0.0001,
     batch_size=32,
@@ -37,6 +37,7 @@ wandbcb = WandbCallback(monitor='val_n_mae', save_model=False)
 
 loss = config.loss
 y_range = (config.y_s, config.y_e)
+y_nums = y_range[1] - y_range[0] + 1
 learning_rate = config.learning_rate
 batch_size = config.batch_size
 epochs = config.epochs
@@ -107,7 +108,6 @@ for v in video_names:
     img_list = find_imgs(video_path)
     ds = build_dataset_from_slices(img_list, batch_size=1, shuffle=False)
     strategy = tf.distribute.MirroredStrategy()
-    n_mae = normalize_mae(100)  # make mae loss normalized into range 0 - 100.
     with strategy.scope():
         prediction = model.predict(ds, verbose=1)
     predictions[v] = prediction
