@@ -5,13 +5,6 @@
 # Date  : 24/6/2020
 
 
-def is_intersect(a, b):
-    if a[0] > b[1] or a[1] < b[0]:
-        return False
-    else:
-        return True
-
-
 def action_search(completeness_array, min_T, max_T, min_L):
     import numpy as np
     """
@@ -24,6 +17,11 @@ def action_search(completeness_array, min_T, max_T, min_L):
     Examples:
     min_T, max_T, min_L = 75, 20, 35
     """
+    def is_intersect(a, b):
+        if a[0] > b[1] or a[1] < b[0]:
+            return False
+        else:
+            return True
     P = completeness_array.squeeze()
     C_startframe = np.where(P < max_T)[0]  # "C_" represent variable for candidates.
     C_endframe = np.where(P > min_T)[0]
@@ -47,4 +45,4 @@ def action_search(completeness_array, min_T, max_T, min_L):
                 if beat_any_one or not any_intersection:
                     action_detected.append(action_candidate)
     action_detected.sort(key=lambda x: x[2])
-    return action_detected
+    return np.array(action_detected).reshape(-1, 3)

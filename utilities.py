@@ -282,6 +282,8 @@ def calc_truepositive(action_detected, temporal_annotations, iou_T):
     """
     import numpy as np
     num_detection = action_detected.shape[0]
+    if num_detection == 0:
+        return np.array([], dtype=np.int)
     iou_matrix = matrix_iou(temporal_annotations, action_detected[:, :2])
     tp = np.zeros(num_detection, dtype=np.int)
     for r in range(iou_matrix.shape[0]):

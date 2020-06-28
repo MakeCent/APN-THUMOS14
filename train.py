@@ -104,10 +104,10 @@ import pandas as pd
 temporal_annotation = pd.read_csv(annfile['test'], header=None)
 video_names = temporal_annotation.iloc[:, 0].unique()
 predictions = {}
-ground_truth = []
+ground_truth = {}
 for v in video_names:
     gt = temporal_annotation.loc[temporal_annotation.iloc[:, 0] == v].iloc[:, 1:].values
-    ground_truth.append(gt)
+    ground_truth[v] = gt
 
     video_path = Path(root['test'], v)
     img_list = find_imgs(video_path)
@@ -118,14 +118,14 @@ for v in video_names:
 # %% Detect actions
 import numpy as np
 from action_detection import action_search
-action_detected = []
-tps = []
-for k, prediction in predictions.items():
+action_detected = {}
+tps = {}
+for v, prediction in predictions.items():
     ads = action_search(prediction, min_T=65, max_T=30, min_L=35)
-    ads = np.array(ads)
-    action_detected.append(ads)
-    tps.append(calc_truepositive(ads, ground_truth[k], 0.5))
+    action_detected[v] = ads
+    tps[v] = calc_truepositive(ads, ground_truth[v], 0.5)
 
-num_gt = np.vstack(ground_truth).shape[0]
-loss = np.vstack(action_detected)[:, 2]
-ap = average_precision(np.hstack(tps), num_gt, loss)
+num_gt = sum([len(gt) for gt in ground_truth.values()])
+loss = np.vstack(action_detected.values())[:, 2]
+tp_values = np.hstack(tps.values())
+ap = average_precision(tp_values, num_gt, loss)
