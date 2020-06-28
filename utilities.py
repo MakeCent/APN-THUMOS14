@@ -320,5 +320,5 @@ def mae_od(y_true, y_pred):
 
 def ordinal2completeness(array):
     import numpy as np
-    completeness = np.count_nonzero(array)
+    completeness = np.count_nonzero(array > 0.5)
     return completeness
