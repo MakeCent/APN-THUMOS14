@@ -108,9 +108,7 @@ for v in video_names:
     video_path = Path(root['test'], v)
     flow_list = find_flows(video_path)
     ds = stack_optical_flow(flow_list, batch_size=1, shuffle=False)
-    strategy = tf.distribute.MirroredStrategy()
-    with strategy.scope():
-        prediction = model.predict(ds, verbose=1)
+    prediction = model.predict(ds, verbose=1)
     predictions[v] = np.array([ordinal2completeness(p) for p in prediction])
 
 # %% Detect actions
