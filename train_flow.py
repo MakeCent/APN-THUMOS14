@@ -31,7 +31,7 @@ default_config = dict(
     action="GolfSwing",
     agent=agent
 )
-wandb.init(config=default_config, name=now, notes='use 10 stacked optical_flow to train, mse loss')
+wandb.init(config=default_config, name=now, notes='train with optical_flow (10), mse loss')
 config = wandb.config
 wandbcb = WandbCallback(monitor='val_n_mae', save_model=False)
 

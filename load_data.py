@@ -17,7 +17,36 @@ def format_img(image, label=None):
         return image, label
 
 
-def read_from_annfile(root, annfile, y_range, mode='rgb', orinal=False, stack_length=10):
+def generate_labels(length, y_range, ordinal=False):
+    import numpy as np
+    y_nums = y_range[1] - y_range[0] + 1
+    completeness = np.linspace(*y_range, num=length, dtype=np.float32)
+    if ordinal:
+        rounded_completeness = np.round(completeness)
+        ordinal_completeness = np.array([[1] * int(c) + [0] * int(y_nums - c) for c in rounded_completeness],
+                                        dtype=np.float32)
+        return ordinal_completeness
+    else:
+        return completeness
+
+
+def generate_multitask_labels(length, y_range, action_num, ordinal=False):
+    import numpy as np
+    y_nums = y_range[1] - y_range[0] + 1
+    completeness = np.linspace(*y_range, num=length, dtype=np.float32)
+    multitask_completeness = np.array([[c] + [0] * (y_nums - 1) for c in completeness])
+    if ordinal:
+        rounded_completeness = np.round(completeness)
+        ordinal_completeness = np.array([[1] * int(c) + [0] * int(y_nums - c) for c in rounded_completeness],
+                                        dtype=np.float32)
+        multitask_ordinal_completeness = np.array(
+            [np.pad(np.expand_dims(odc, 0), [(0, action_num - 1), (0, 0)]) for odc in ordinal_completeness])
+        return multitask_ordinal_completeness
+    else:
+        return multitask_completeness
+
+
+def read_from_annfile(root, annfile, y_range, mode='rgb', ordinal=False, stack_length=10, label_func=generate_labels):
     """
     According to the temporal annotation file. Create list of image paths and list of labels.
     :param root: String. Directory where all images are stored.
@@ -28,16 +57,6 @@ def read_from_annfile(root, annfile, y_range, mode='rgb', orinal=False, stack_le
     import pandas as pd
     import numpy as np
     temporal_annotations = pd.read_csv(annfile, header=None)
-    y_nums = y_range[1] - y_range[0] + 1
-
-    def generate_labels(length):
-        completeness = np.linspace(*y_range, num=length, dtype=np.float32)
-        if orinal:
-            rounded_completeness = np.round(completeness)
-            ordinal_completeness = np.array([[1]*int(c) + [0]*int(y_nums-c) for c in rounded_completeness], dtype=np.float32)
-            return ordinal_completeness
-        else:
-            return completeness
 
     if mode == 'rgb':
         img_paths, labels = [], []
@@ -45,20 +64,38 @@ def read_from_annfile(root, annfile, y_range, mode='rgb', orinal=False, stack_le
             action_length = row.values[2] + 1 - row.values[1]
             img_paths.extend(["{}/{}/{}.jpg".format(root, row.values[0], str(num).zfill(5)) for num in
                               np.arange(row.values[1], row.values[2] + 1)])
-            labels.extend(generate_labels(action_length))
+            labels.extend(label_func(action_length, y_range=y_range, ordinal=ordinal))
         return img_paths, labels
 
     elif mode == 'flow':
         flow_paths, labels = [], []
         for i_r, row in temporal_annotations.iterrows():
-            flow_paths.append(["{}/{}/{}/{}_{}.jpg".format(root, row.values[0], d, d, str(num+1).zfill(5)) for num in
+            flow_paths.append(["{}/{}/{}/{}_{}.jpg".format(root, row.values[0], d, d, str(num + 1).zfill(5)) for num in
                                np.arange(row.values[1], row.values[2]) for d in ['flow_x', 'flow_y']])
         stacked_flow_list = []
         for v_fl in flow_paths:
-            v_stacked_flow = [v_fl[2*i:2*i+stack_length*2] for i in range(0, len(v_fl)//2 - stack_length + 1)]
-            labels.extend(generate_labels(len(v_stacked_flow)))
+            v_stacked_flow = [v_fl[2 * i:2 * i + stack_length * 2] for i in range(0, len(v_fl) // 2 - stack_length + 1)]
+            labels.extend(label_func(len(v_stacked_flow), y_range=y_range, ordinal=ordinal))
             stacked_flow_list.extend(v_stacked_flow)
         return stacked_flow_list, labels
+
+
+def read_from_anndir(root, anndir, y_range, mode='rgb', orinal=False, stack_length=10):
+    """
+    According to the temporal annotation file. Create list of image paths and list of labels.
+    :param root: String. Directory where all images are stored.
+    :param anndir: String. Path where temporal annotation locates.
+    :param y_range: Tuple. Label range.
+    :return: List, List. List of image paths and list of labels.
+    """
+    from pathlib import Path
+
+    datalist, ylist = [], []
+    for annfile in Path(anndir).iterdir():
+        action_list, label_list = read_from_annfile(root, str(annfile), y_range, mode, orinal, stack_length)
+        datalist.extend(action_list)
+        ylist.extend(label_list)
+    return datalist, ylist
 
 
 # %% Basic function: Can be easily used in other programs.
@@ -163,7 +200,7 @@ def find_flows(video_path, suffix='jpg', stack_length=10):
     flow_x = sorted(video_path.glob('flow_x/*.{}'.format(suffix)))
     flow_y = sorted(video_path.glob('flow_y/*.{}'.format(suffix)))
     v_fl = [str(e) for xy in zip(flow_x, flow_y) for e in xy]
-    v_stacked_flow = [v_fl[2*i:2*i+stack_length*2] for i in range(0, len(v_fl)//2 - stack_length + 1)]
+    v_stacked_flow = [v_fl[2 * i:2 * i + stack_length * 2] for i in range(0, len(v_fl) // 2 - stack_length + 1)]
     return v_stacked_flow
 
 

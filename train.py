@@ -78,7 +78,7 @@ n_mae = normalize_mae(y_nums)  # make mae loss normalized into range 0 - 100.
 strategy = tf.distribute.MirroredStrategy()
 with strategy.scope():
     inputs = tf.keras.Input(shape=(224, 224, 3))
-    backbone = ResNet101(weights=None, input_shape=(224, 224, 3), pooling='avg', include_top=False)
+    backbone = ResNet101(weights='imagenet', input_shape=(224, 224, 3), pooling='avg', include_top=False)
     x = backbone(inputs)
     x = Dense(64, activation='relu', kernel_initializer='he_uniform')(x)
     x = Dropout(0.5)(x)
@@ -118,14 +118,20 @@ for v in video_names:
 # %% Detect actions
 import numpy as np
 from action_detection import action_search
-action_detected = {}
-tps = {}
-for v, prediction in predictions.items():
-    ads = action_search(prediction, min_T=65, max_T=30, min_L=35)
-    action_detected[v] = ads
-    tps[v] = calc_truepositive(ads, ground_truth[v], 0.5)
 
-num_gt = sum([len(gt) for gt in ground_truth.values()])
-loss = np.vstack(list(action_detected.values()))[:, 2]
-tp_values = np.hstack(list(tps.values()))
-ap = average_precision(tp_values, num_gt, loss)
+aps = {}
+for min_T in range(55, 90 ,5):
+    for max_T in range(5, 45, 5):
+        for min_L in range(30, 100, 10):
+            action_detected = {}
+            tps = {}
+            for v, prediction in predictions.items():
+                ads = action_search(prediction, min_T=65, max_T=30, min_L=45)
+                action_detected[v] = ads
+                tps[v] = calc_truepositive(ads, ground_truth[v], 0.5)
+
+            num_gt = sum([len(gt) for gt in ground_truth.values()])
+            loss = np.vstack(list(action_detected.values()))[:, 2]
+            tp_values = np.hstack(list(tps.values()))
+            ap = average_precision(tp_values, num_gt, loss)
+            aps['{}-{}-{}'.format(min_L, max_T, min_L)] = ap

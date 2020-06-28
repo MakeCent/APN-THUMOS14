@@ -241,7 +241,7 @@ class BiasLayer(tf.keras.layers.Layer):
 
     def build(self, input_shape):
         self.bias = self.add_weight('bias',
-                                    shape=self.units,
+                                    shape=(input_shape[-1], self.units),
                                     initializer='zeros',
                                     trainable=True)
 
@@ -324,3 +324,17 @@ def ordinal2completeness(array):
     import numpy as np
     completeness = np.count_nonzero(array > 0.5)
     return completeness
+
+
+def multi_binarycrossentropy(y_true, y_pred):
+    import tensorflow as tf
+    multi_ordinal_loss = tf.keras.losses.binary_crossentropy(y_true, y_pred)
+    multi_ordinal_loss - tf.math.reduce_sum(multi_ordinal_loss)
+    return multi_ordinal_loss
+
+def multi_od_metric(y_true, y_pred):
+    import tensorflow as tf
+    predict_completeness = tf.math.count_nonzero(y_pred > 0.5, axis=-1)
+    true_completeness = tf.math.count_nonzero(y_true > 0.5, axis=-1)
+    multi_ordinal_loss = tf.keras.losses.binary_crossentropy(true_completeness, predict_completeness)
+    return multi_ordinal_loss
