@@ -112,16 +112,16 @@ for v in video_names:
     predictions[v] = np.array([ordinal2completeness(p) for p in prediction])
 
 # %% Detect actions
+import numpy as np
 from action_detection import action_search
-action_detected = []
-tps = []
-for k, prediction in predictions.items():
+action_detected = {}
+tps = {}
+for v, prediction in predictions.items():
     ads = action_search(prediction, min_T=65, max_T=30, min_L=35)
-    ads = np.array(ads)
-    action_detected.append(ads)
-    tps.append(calc_truepositive(ads, ground_truth[k], 0.5))
+    action_detected[v] = ads
+    tps[v] = calc_truepositive(ads, ground_truth[v], 0.5)
 
-num_gt = np.vstack(ground_truth).shape[0]
-loss = np.vstack(action_detected)[:, 2]
-ap = average_precision(np.hstack(tps), num_gt, loss)
-print("Average Precision: {}".format(ap))
+num_gt = sum([len(gt) for gt in ground_truth.values()])
+loss = np.vstack(action_detected.values())[:, 2]
+tp_values = np.hstack(tps.values())
+ap = average_precision(tp_values, num_gt, loss)
