@@ -27,11 +27,11 @@ default_config = dict(
     y_e=100,
     learning_rate=0.0001,
     batch_size=32,
-    epochs=0,
+    epochs=50,
     action="GolfSwing",
     agent=agent
 )
-wandb.init(config=default_config, name=now, notes='no ordinal no flow, y start from 10')
+wandb.init(config=default_config, name=now, notes='baseline:no ordinal no flow, train and val for train, no pretrain on imagenet.')
 config = wandb.config
 wandbcb = WandbCallback(monitor='val_n_mae', save_model=False)
 
