@@ -100,10 +100,10 @@ import numpy as np
 temporal_annotation = pd.read_csv(annfile['test'], header=None)
 video_names = temporal_annotation.iloc[:, 0].unique()
 predictions = {}
-ground_truth = []
+ground_truth = {}
 for v in video_names:
     gt = temporal_annotation.loc[temporal_annotation.iloc[:, 0] == v].iloc[:, 1:].values
-    ground_truth.append(gt)
+    ground_truth[v] = gt
 
     video_path = Path(root['test'], v)
     flow_list = find_flows(video_path)
