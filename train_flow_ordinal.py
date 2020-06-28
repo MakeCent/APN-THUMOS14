@@ -122,6 +122,6 @@ for v, prediction in predictions.items():
     tps[v] = calc_truepositive(ads, ground_truth[v], 0.5)
 
 num_gt = sum([len(gt) for gt in ground_truth.values()])
-loss = np.vstack(action_detected.values())[:, 2]
-tp_values = np.hstack(tps.values())
+loss = np.vstack(list(action_detected.values()))[:, 2]
+tp_values = np.hstack(list(tps.values()))
 ap = average_precision(tp_values, num_gt, loss)
