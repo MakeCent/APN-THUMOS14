@@ -424,11 +424,11 @@ def insert_layer_nonseq(model, layer_regex, insert_layer_factory, insert_layer_n
                 raise ValueError('position must be: before, after or replace')
 
             new_layer = insert_layer_factory()
-            if insert_layer_name:
-                new_layer.name = insert_layer_name
-            else:
-                new_layer.name = '{}_{}'.format(layer.name,
-                                                new_layer.name)
+            # if insert_layer_name:
+            #     new_layer.name = insert_layer_name
+            # else:
+            #     new_layer.name = '{}_{}'.format(layer.name,
+            #                                     new_layer.name)
             x = new_layer(x, training=new_training)
             print('New layer: {} Old layer: {} Type: {}'.format(new_layer.name,
                                                                 layer.name, position))
@@ -442,7 +442,7 @@ def insert_layer_nonseq(model, layer_regex, insert_layer_factory, insert_layer_n
         network_dict['new_output_tensor_of'].update({layer.name: x})
 
         # Save tensor in output list if it is output in initial model
-        if layer_name in model.output_names:
+        if layer.name in model.output_names:
             model_outputs.append(x)
 
     return Model(inputs=model.inputs, outputs=model_outputs)
