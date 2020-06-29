@@ -26,8 +26,8 @@ default_config = dict(
     y_s=1,
     y_e=100,
     learning_rate=0.0001,
-    batch_size=32,
-    epochs=0,
+    batch_size=256,
+    epochs=100,
     agent=agent
 )
 wandb.init(config=default_config, name=now, notes='one model for all action, multi-task train')
@@ -71,7 +71,7 @@ with strategy.scope():
     x = backbone(inputs)
     x = Dense(1024, activation='relu', kernel_initializer='he_uniform')(x)
     x = Dropout(0.5)(x)
-    x = Dense(256, activation='relu', kernel_initializer='he_uniform')(x)
+    x = Dense(1024, activation='relu', kernel_initializer='he_uniform')(x)
     x = Dropout(0.5)(x)
     x = Dense(action_num, kernel_initializer='he_uniform', use_bias=False)(x)
     x = BiasLayer(y_nums)(x)

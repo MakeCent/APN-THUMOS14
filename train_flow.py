@@ -73,13 +73,13 @@ train_val_dataset = stack_optical_flow(*train_val_datalist, batch_size=batch_siz
 n_mae = normalize_mae(y_range[1] - y_range[0])  # make mae loss normalized into range 0 - 100.
 strategy = tf.distribute.MirroredStrategy()
 pretrained = ResNet101(weights='imagenet', input_shape=(224, 224, 3), pooling='avg', include_top=False)
-weights = pretrained.layers[1].get_weights()[0]
-biases = pretrained.layers[1].get_weights()[1]
-extended_kernels = np.repeat(weights.mean(axis=1)[:, :, np.newaxis], 10, axis=1)
+weights = pretrained.layers[2].get_weights()[0]
+biases = pretrained.layers[2].get_weights()[1]
+extended_kernels = np.repeat(weights.mean(axis=2)[:, :, np.newaxis], 20, axis=2)
 with strategy.scope():
     inputs = tf.keras.Input(shape=(224, 224, 20))
     backbone = ResNet101(weights=None, input_shape=(224, 224, 20), pooling='avg', include_top=False)
-    backbone.layers[1].set_weights([extended_kernels, biases])
+    backbone.layers[2].set_weights([extended_kernels, biases])
     x = backbone(inputs)
     x = Dense(64, activation='relu', kernel_initializer='he_uniform')(x)
     x = Dropout(0.5)(x)
