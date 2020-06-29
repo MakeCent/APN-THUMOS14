@@ -146,9 +146,9 @@ mkdir OpticalFlows/validation
 mkdir OpticalFlows/test
 docker run --gpus all -it --name optical_flow --user 1000 -v path_to_THUMOS14:/data wizyoung/optical-flow-gpu bash  ## Change the path with your own.
 # argument --num_gpu may need to be modified if you have less than 2 gpus
-python multi_gpu_extract.py /data/Information/train_video_list.txt /data/OpticalFlows/train --out_fmt dir --log /data/Information/train.log --num_gpu 2
-python multi_gpu_extract.py /data/Information/validation_video_list.txt /data/OpticalFlows/validation --out_fmt dir --log /data/Information/validation.log --num_gpu 2
-python multi_gpu_extract.py /data/Information/test_video_list.txt /data/OpticalFlows/test --out_fmt dir --log /data/Information/test.log --num_gpu 2
+python multi_gpu_extract.py /data/Information/train_video_paths.txt /data/OpticalFlows/train --out_fmt dir --log /data/Information/train.log --num_gpu 2
+python multi_gpu_extract.py /data/Information/validation_video_paths.txt /data/OpticalFlows/validation --out_fmt dir --log /data/Information/validation.log --num_gpu 2
+python multi_gpu_extract.py /data/Information/test_video_paths.txt /data/OpticalFlows/test --out_fmt dir --log /data/Information/test.log --num_gpu 2
 ```
 
 ## Check
