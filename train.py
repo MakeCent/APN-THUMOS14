@@ -37,7 +37,7 @@ wandbcb = WandbCallback(monitor='val_n_mae', save_model=False)
 
 loss = config.loss
 y_range = (config.y_s, config.y_e)
-y_nums = y_range[1] - y_range[0]
+y_nums = y_range[1] - y_range[0] + 1
 learning_rate = config.learning_rate
 batch_size = config.batch_size
 epochs = config.epochs

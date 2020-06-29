@@ -63,7 +63,7 @@ models_path.mkdir(parents=True, exist_ok=True)
 
 # %% Build dataset
 
-datalist = {x: read_from_annfile(root[x], annfile[x], y_range, mode='flow', orinal=True) for x in ['train', 'val', 'test']}
+datalist = {x: read_from_annfile(root[x], annfile[x], y_range, mode='flow', ordinal=True) for x in ['train', 'val', 'test']}
 test_dataset = stack_optical_flow(*datalist['test'], batch_size=batch_size, shuffle=False)
 train_val_datalist = (datalist['train'][0]+datalist['val'][0], datalist['train'][1]+datalist['val'][1])
 train_val_dataset = stack_optical_flow(*train_val_datalist, batch_size=batch_size)
