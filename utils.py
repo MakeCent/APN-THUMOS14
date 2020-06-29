@@ -68,7 +68,7 @@ def annotation_time2frame(mp4path, annotation_path):
     annotation_path = Path(annotation_path)
     annotationF_path = annotation_path.parent.joinpath('annotationF')
     annotationF_path.mkdir(parents=True, exist_ok=True)
-    for gtp in annotation_path.glob('[!A]*.csv'):
+    for gtp in annotation_path.glob('[!A]*.txt'):
         train_ground_truth = pd.read_csv(gtp, sep='\s+', header=None)
         with open(annotationF_path.joinpath(gtp.stem+'F.csv'), 'w', newline='', encoding='utf-8') as f:
             writer = csv.writer(f)
