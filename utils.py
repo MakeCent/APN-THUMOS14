@@ -57,18 +57,20 @@ def annotation_time2frame(mp4path, annotation_path):
     :return:
         None. create .csv files in same directory with annotation_path.
     Examples:
-    mp4path = "/mnt/louis-consistent/Datasets/THUMOS14/TH14_test_set_mp4"
-    annotation_path = "/mnt/louis-consistent/Datasets/THUMOS14/TH14_Temporal_annotations_test/annotation"
+    mp4path = "/mnt/louis-consistent/Datasets/THUMOS14/Videos/validation_mp4"
+    annotation_path = "/mnt/louis-consistent/Datasets/THUMOS14/Annotations/validation/annotation"
     """
     import pandas as pd
     import cv2 as cv
     import csv
     from pathlib import Path
 
-    annotation_path= Path(annotation_path)
-    for gtp in annotation_path.iterdir():
+    annotation_path = Path(annotation_path)
+    annotationF_path = annotation_path.parent.joinpath('annotationF')
+    annotationF_path.mkdir(parents=True, exist_ok=True)
+    for gtp in annotation_path.glob('[!A]*.csv'):
         train_ground_truth = pd.read_csv(gtp, sep='\s+', header=None)
-        with open(annotation_path.joinpath(gtp.stem+'F'+'.csv'), 'w', newline='', encoding='utf-8') as f:
+        with open(annotationF_path.joinpath(gtp.stem+'F.csv'), 'w', newline='', encoding='utf-8') as f:
             writer = csv.writer(f)
             for _, row in train_ground_truth.iterrows():
                 vn, start, end = row.values
