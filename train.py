@@ -5,7 +5,7 @@
 # Date  : 3/29/2020
 
 from load_data import *
-from utilities import *
+from utils import *
 from pathlib import Path
 from tensorflow.keras.applications import ResNet101
 from tensorflow.keras.layers import Dense, Dropout
@@ -31,7 +31,7 @@ default_config = dict(
     action="GolfSwing",
     agent=agent
 )
-wandb.init(config=default_config, name=now, notes='no ordinal no flow, pretrain on imagenet.')
+wandb.init(config=default_config, name=now, notes='no ordinal no flow, pretrain on imagenet, change fc layer to 2048, 2048 to be the same as in ordinal')
 config = wandb.config
 wandbcb = WandbCallback(monitor='val_n_mae', save_model=False)
 
@@ -80,9 +80,9 @@ with strategy.scope():
     inputs = tf.keras.Input(shape=(224, 224, 3))
     backbone = ResNet101(weights='imagenet', input_shape=(224, 224, 3), pooling='avg', include_top=False)
     x = backbone(inputs)
-    x = Dense(64, activation='relu', kernel_initializer='he_uniform')(x)
+    x = Dense(2048, activation='relu', kernel_initializer='he_uniform')(x)
     x = Dropout(0.5)(x)
-    x = Dense(32, activation='relu', kernel_initializer='he_uniform')(x)
+    x = Dense(2048, activation='relu', kernel_initializer='he_uniform')(x)
     x = Dropout(0.5)(x)
     output = Dense(1, kernel_initializer='he_uniform')(x)
     model = Model(inputs, output)

@@ -4,12 +4,12 @@
 # Author: Chongkai LU
 # Date  : 3/29/2020
 from load_data import *
-from utilities import *
+from utils import *
 import numpy as np
 import pandas as pd
 from pathlib import Path
 from load_data import *
-from utilities import *
+from utils import *
 from action_detection import action_search
 action = "GolfSwing"
 model_path = "/mnt/louis-consistent/Saved/THUMOS14_output/GolfSwing/Model/30-15.67.h5"

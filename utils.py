@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 # -*- coding: utf-8 -*-
-# File  : utilities.py
+# File  : utils.py
 # Author: Chongkai LU
 # Date  : 26/5/2020
 
@@ -26,13 +26,14 @@ def video2images(video_path, save_path, suffix='mp4'):
     :return:
         Nothing.
     Example:
-    video_path = "/mnt/louis-consistent/Datasets/THUMOS14/TH14_test_set_mp4"
-    save_path = "/mnt/louis-consistent/Datasets/THUMOS14/Test"2
+    video_path = "/mnt/louis-consistent/Datasets/THUMOS14/Videos/validation_mp4"
+    save_path = "/mnt/louis-consistent/Datasets/THUMOS14/Images/validation"
     suffix = "mp4"
     """
     from pathlib import Path
     import cv2
     videos = Path(video_path).glob('*.'+suffix)
+    save_path.mkdir(parents=True, exist_ok=True)
     for video in videos:
         image_path = Path(save_path, video.stem)
         image_path.mkdir()

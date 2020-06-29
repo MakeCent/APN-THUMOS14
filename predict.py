@@ -8,7 +8,7 @@ import pandas as pd
 from pathlib import Path
 import tensorflow as tf
 from load_data import *
-from utilities import *
+from utils import *
 from action_detection import action_search
 
 # %% Test on a Untrimmed video

@@ -5,7 +5,7 @@
 # Date  : 3/29/2020
 
 from load_data import *
-from utilities import *
+from utils import *
 from pathlib import Path
 from tensorflow.keras.applications import ResNet101
 from tensorflow.keras.layers import Dense, Dropout, Activation
