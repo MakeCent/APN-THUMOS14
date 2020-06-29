@@ -225,36 +225,6 @@ def plot_prediction(video_prediction):
     plt.grid()
     plt.show()
 
-import tensorflow as tf
-class LossCallback(tf.keras.callbacks.Callback):
-
-    def on_test_begin(self, logs=None):
-        self.n_mae = []
-        self.loss = []
-
-    def on_test_batch_end(self, batch, logs=None):
-        self.loss.append(logs['loss'])
-        self.n_mae.append(logs['n_mae'])
-
-
-class BiasLayer(tf.keras.layers.Layer):
-    def __init__(self, units, *args, **kwargs):
-        super(BiasLayer, self).__init__(*args, **kwargs)
-        self.units = units
-
-    def build(self, input_shape):
-        self.bias = self.add_weight('bias',
-                                    shape=(input_shape[-1], self.units),
-                                    initializer='zeros',
-                                    trainable=True)
-
-    def get_config(self):
-        config = super().get_config().copy()
-        config.update({'units': self.units,})
-        return config
-
-    def call(self, input):
-        return input + self.bias
 
 
 def matrix_iou(gt, ads):
@@ -342,3 +312,46 @@ def multi_od_metric(y_true, y_pred):
     true_completeness = tf.math.count_nonzero(y_true > 0.5, axis=-1)
     multi_ordinal_loss = tf.keras.losses.binary_crossentropy(true_completeness, predict_completeness)
     return multi_ordinal_loss
+
+
+def action_search(completeness_array, min_T, max_T, min_L):
+    import numpy as np
+    """
+    Detect (temporal localization) complete action on completeness list.
+    :param completeness_array: Numpy Array. List of float numbers, completeness of frames
+    :param min_T: Int. Minimum completeness value threshold used to find end frame candidates.
+    :param max_T: Int. Maximum completeness value threshold used to find start frame candidates.
+    :param min_L: Int. Minimum complete action length used
+    :return: List. List of list. each list represent a detected action illustrated as [start_inx(int) end_inx(int) loss(float)]
+    Examples:
+    min_T, max_T, min_L = 75, 20, 35
+    """
+    def is_intersect(a, b):
+        if a[0] > b[1] or a[1] < b[0]:
+            return False
+        else:
+            return True
+    P = completeness_array.squeeze()
+    C_startframe = np.where(P < max_T)[0]  # "C_" represent variable for candidates.
+    C_endframe = np.where(P > min_T)[0]
+    action_detected = []
+    for s_i in C_startframe:
+        for e_i in C_endframe:
+            C_action_length = e_i - s_i + 1
+            if C_action_length > min_L:
+                action_template = np.linspace(0, 100, C_action_length)
+                predicted_sequence = P[s_i:e_i + 1]
+                mse = ((action_template - predicted_sequence) ** 2).mean()
+                action_candidate = [s_i, e_i, mse]
+                any_intersection = False
+                beat_any_one = False
+                for i, action in enumerate(action_detected):
+                    if is_intersect(action, action_candidate):
+                        any_intersection = True
+                        if action_candidate[2] < action[2]:
+                            beat_any_one = True
+                            action_detected.pop(i)
+                if beat_any_one or not any_intersection:
+                    action_detected.append(action_candidate)
+    action_detected.sort(key=lambda x: x[2])
+    return np.array(action_detected).reshape(-1, 3)

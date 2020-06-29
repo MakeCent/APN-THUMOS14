@@ -3,14 +3,12 @@
 # File  : train.py
 # Author: Chongkai LU
 # Date  : 3/29/2020
-from load_data import *
-from utils import *
+import tensorflow as tf
 import numpy as np
 import pandas as pd
 from pathlib import Path
 from load_data import *
 from utils import *
-from action_detection import action_search
 action = "GolfSwing"
 model_path = "/mnt/louis-consistent/Saved/THUMOS14_output/GolfSwing/Model/30-15.67.h5"
 annfile = "/mnt/louis-consistent/Datasets/THUMOS14/Annotations/test/annotationF/{}_testF.csv".format(action)

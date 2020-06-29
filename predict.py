@@ -4,12 +4,11 @@
 # Author: Chongkai LU
 # Date  : 6/9/2020
 import numpy as np
-import pandas as pd
+from custom_class import *
 from pathlib import Path
 import tensorflow as tf
 from load_data import *
 from utils import *
-from action_detection import action_search
 
 # %% Test on a Untrimmed video
 action = "GolfSwing"
@@ -62,26 +61,6 @@ flow_test_dataset = stack_optical_flow(*flow_datalist['test'], batch_size=1, shu
 
 
 strategy = tf.distribute.MirroredStrategy()
-
-class RGBLossCallback(tf.keras.callbacks.Callback):
-
-    def on_test_begin(self, logs=None):
-        self.n_mae = []
-        self.loss = []
-
-    def on_test_batch_end(self, batch, logs=None):
-        self.loss.append(logs['loss'])
-        self.n_mae.append(logs['n_mae'])
-
-class FLowLossCallback(tf.keras.callbacks.Callback):
-
-    def on_test_begin(self, logs=None):
-        self.mae_od = []
-        self.loss = []
-
-    def on_test_batch_end(self, batch, logs=None):
-        self.loss.append(logs['loss'])
-        self.mae_od.append(logs['mae_od'])
 
 # rgb_train_records = LossCallback()
 # rgb_val_records = LossCallback()
@@ -148,7 +127,6 @@ for v in video_names:
 
 # %% Detect actions
 import numpy as np
-from action_detection import action_search
 num_gt = sum([len(gt) for gt in ground_truth.values()])
 
 iou = 0.3

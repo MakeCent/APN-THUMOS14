@@ -115,7 +115,6 @@ for v in video_names:
 
 # %% Detect actions
 import numpy as np
-from action_detection import action_search
 action_detected = {}
 tps = {}
 for v, prediction in predictions.items():

@@ -16,6 +16,7 @@ from wandb.keras import WandbCallback
 import datetime
 import tensorflow as tf
 import socket
+from custom_class import BiasLayer
 agent = socket.gethostname()
 AUTOTUNE = tf.data.experimental.AUTOTUNE
 fix_bug()
@@ -113,7 +114,6 @@ for v in video_names:
 
 # %% Detect actions
 import numpy as np
-from action_detection import action_search
 action_detected = {}
 tps = {}
 for v, prediction in predictions.items():
