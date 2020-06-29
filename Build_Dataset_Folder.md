@@ -110,7 +110,7 @@ for action in Path("{}/Videos/train_avi".format(path_to_THUMOS14)).iterdir():
 The most simplest way to do this is to use docker image by [wizyoung/Optical-Flow-GPU-Docker](https://github.com/wizyoung/Optical-Flow-GPU-Docker). 
 Before you start to compute optical flows, you need get some files that store the path of video that you want to compute optical flow for. 
 
-For THUMOS14, I have already made templates for train, validation and test data. They are stored in the Information folder which can be download from the [link](https://drive.google.com/file/d/1p1neDDzCrEafiQgI0bTy0-6QEyWKRIbM/view?usp=sharing). Please download it and unzip it and put it in THUMOS14 folder.
+For THUMOS14, I have already made templates for train, validation and test data. They are stored in the Information folder which can be download from the [link](https://drive.google.com/file/d/1q2ZMjucEIWsH_TWdbrNqGKWydhrk0xZe/view?usp=sharing). Please download it and unzip it and put it in THUMOS14 folder.
 
 In the case you have installed docker and nvidia-docker, and has download my Information folder and put it in THUMOS14:
 ```
