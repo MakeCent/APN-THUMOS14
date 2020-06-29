@@ -32,7 +32,7 @@ def video2images(video_path, save_path, suffix='mp4'):
     """
     from pathlib import Path
     import cv2
-    videos = Path(video_path).glob('*.'+suffix)
+    videos = Path(video_path).glob('*.' + suffix)
     Path(save_path).mkdir(parents=True, exist_ok=True)
     for video in videos:
         image_path = Path(save_path, video.stem)
@@ -41,7 +41,7 @@ def video2images(video_path, save_path, suffix='mp4'):
         success, image = vidcap.read()
         count = 0
         while success:
-            cv2.imwrite("%s/%s.jpg" % (image_path, str(count).zfill(5)), image)     # save frame as JPEG file
+            cv2.imwrite("%s/%s.jpg" % (image_path, str(count).zfill(5)), image)  # save frame as JPEG file
             success, image = vidcap.read()
             print('Read a new frame: ', success)
             count += 1
@@ -70,14 +70,14 @@ def annotation_time2frame(mp4path, annotation_path):
     annotationF_path.mkdir(parents=True, exist_ok=True)
     for gtp in annotation_path.glob('[!A]*.txt'):
         train_ground_truth = pd.read_csv(gtp, sep='\s+', header=None)
-        with open(annotationF_path.joinpath(gtp.stem+'F.csv'), 'w', newline='', encoding='utf-8') as f:
+        with open(annotationF_path.joinpath(gtp.stem + 'F.csv'), 'w', newline='', encoding='utf-8') as f:
             writer = csv.writer(f)
             for _, row in train_ground_truth.iterrows():
                 vn, start, end = row.values
                 vc = cv.VideoCapture(mp4path + '/' + vn + '.mp4')
-                vc.set(cv.CAP_PROP_POS_MSEC, start*1000)
+                vc.set(cv.CAP_PROP_POS_MSEC, start * 1000)
                 startf = int(vc.get(cv.CAP_PROP_POS_FRAMES))
-                vc.set(cv.CAP_PROP_POS_MSEC, end*1000)
+                vc.set(cv.CAP_PROP_POS_MSEC, end * 1000)
                 endf = int(vc.get(cv.CAP_PROP_POS_FRAMES))
                 writer.writerow([vn, startf, endf])
 
@@ -127,7 +127,7 @@ def build_model(backbone, dense_layer=(64, 32), out_activation=None):
     model = tf.keras.Sequential()
     model.add(backbone)
     for index, value in enumerate(dense_layer):
-        model.add(Dense(value, activation='relu', name='fc'+str(index+2), kernel_initializer='he_uniform'))
+        model.add(Dense(value, activation='relu', name='fc' + str(index + 2), kernel_initializer='he_uniform'))
         model.add(Dropout(0.5))
     model.add(Dense(1, activation=out_activation, name='output_layer', kernel_initializer='he_uniform'))
     return model
@@ -178,12 +178,12 @@ def lr_schedule(epoch, lr):
     # if epoch == 40:
     #     return lr * 0.2
     # else:
-        return lr
+    return lr
 
 
 def boxplot_split(split_as, split_on):
     boxed = []
-    cuts = [(n, n+1) for n in range(100)]
+    cuts = [(n, n + 1) for n in range(100)]
     for c in cuts:
         boxed.append(list(split_on[(split_as > c[0]) * (split_as <= c[1])].squeeze()))
     return boxed
@@ -226,7 +226,6 @@ def plot_prediction(video_prediction):
     plt.show()
 
 
-
 def matrix_iou(gt, ads):
     import numpy as np
 
@@ -235,8 +234,9 @@ def matrix_iou(gt, ads):
         union = max(a[1], b[1]) - min(a[0], b[0])
         intersection = min(a[1], b[1]) - max(a[0], a[0])
         if intersection > 0:
-            ov = intersection/union
+            ov = intersection / union
         return ov
+
     ov_m = np.zeros([gt.shape[0], ads.shape[0]])
     for i in range(gt.shape[0]):
         for j in range(ads.shape[0]):
@@ -279,9 +279,9 @@ def average_precision(tp, num_gt, loss):
     import numpy as np
     tp = tp[loss.argsort()]
     cum_tp = np.cumsum(tp)
-    cum_fp = np.cumsum(1-tp)
+    cum_fp = np.cumsum(1 - tp)
     precisions = cum_tp / (cum_tp + cum_fp)
-    AP = np.sum(precisions*tp)/num_gt
+    AP = np.sum(precisions * tp) / num_gt
     return AP
 
 
@@ -326,11 +326,13 @@ def action_search(completeness_array, min_T, max_T, min_L):
     Examples:
     min_T, max_T, min_L = 75, 20, 35
     """
+
     def is_intersect(a, b):
         if a[0] > b[1] or a[1] < b[0]:
             return False
         else:
             return True
+
     P = completeness_array.squeeze()
     C_startframe = np.where(P < max_T)[0]  # "C_" represent variable for candidates.
     C_endframe = np.where(P > min_T)[0]
@@ -377,3 +379,70 @@ def replace_intermediate_layer_in_keras(model, layer_id, new_layer, new_training
 
     new_model = Model(input=layers[0].input, output=x)
     return new_model
+
+
+def insert_layer_nonseq(model, layer_regex, insert_layer_factory, insert_layer_name=None, position='after',
+                        new_training=None, other_training=None):
+    import re
+    from tensorflow.keras.models import Model
+    # Auxiliary dictionary to describe the network graph
+    network_dict = {'input_layers_of': {}, 'new_output_tensor_of': {}}
+
+    # Set the input layers of each layer
+    for layer in model.layers:
+        for node in layer._outbound_nodes:
+            layer_name = node.outbound_layer.name
+            if layer_name not in network_dict['input_layers_of']:
+                network_dict['input_layers_of'].update(
+                    {layer_name: [layer.name]})
+            else:
+                network_dict['input_layers_of'][layer_name].append(layer.name)
+
+    # Set the output tensor of the input layer
+    network_dict['new_output_tensor_of'].update(
+        {model.layers[0].name: model.input})
+
+    # Iterate over all layers after the input
+    model_outputs = []
+    for layer in model.layers[1:]:
+
+        # Determine input tensors
+        layer_input = [network_dict['new_output_tensor_of'][layer_aux]
+                       for layer_aux in network_dict['input_layers_of'][layer.name]]
+        if len(layer_input) == 1:
+            layer_input = layer_input[0]
+
+        # Insert layer if name matches the regular expression
+        if re.match(layer_regex, layer.name):
+            if position == 'replace':
+                x = layer_input
+            elif position == 'after':
+                x = layer(layer_input)
+            elif position == 'before':
+                pass
+            else:
+                raise ValueError('position must be: before, after or replace')
+
+            new_layer = insert_layer_factory()
+            if insert_layer_name:
+                new_layer.name = insert_layer_name
+            else:
+                new_layer.name = '{}_{}'.format(layer.name,
+                                                new_layer.name)
+            x = new_layer(x, training=new_training)
+            print('New layer: {} Old layer: {} Type: {}'.format(new_layer.name,
+                                                                layer.name, position))
+            if position == 'before':
+                x = layer(x, training=new_training)
+        else:
+            x = layer(layer_input, training=other_training)
+
+        # Set new output tensor (the original one, or the one of the inserted
+        # layer)
+        network_dict['new_output_tensor_of'].update({layer.name: x})
+
+        # Save tensor in output list if it is output in initial model
+        if layer_name in model.output_names:
+            model_outputs.append(x)
+
+    return Model(inputs=model.inputs, outputs=model_outputs)
