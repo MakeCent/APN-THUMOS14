@@ -4,32 +4,32 @@ This text file give details about how to make a THUMOS14 Dataset Folder. Find a 
 
 THUMOS14
 
-	|-- Videos (NOT Important)
-		|-- train_avi
+	|-- Videos (NOT Important, 185G)
+		|-- train_avi (6.8G)
 			|-- ApplyEyeMakeup
 				|-- v_ApplyEyeMakeup_g01_c01.avi
 				|-- v_ApplyEyeMakeup_g01_c02.avi
 				|-- ...
 			|-- ApplyLipstick
 			|-- ...
-		|-- validation_mp4
-    		|-- video_validation_0000001.mp4
-      		|-- video_validation_0000002.mp4
-      		|-- ...
-		|-- test_mp4
-     		|-- video_test_0000001.mp4
-     		|-- video_test_0000002.mp4
-     		|-- ...
-	|-- Images (Only 20 action classed involved)
-  		|-- train
+		|-- validation_mp4 (79G)
+			|-- video_validation_0000001.mp4
+			|-- video_validation_0000002.mp4
+			|-- ...
+		|-- test_mp4 (99G)
+			|-- video_test_0000001.mp4
+			|-- video_test_0000002.mp4
+			|-- ...
+	|-- Images (Only 20 action classed involved, G)
+  		|-- train ()
 			|-- v_BaseballPitch_g01_c01
-        		|-- 00000.jpg
-        		|-- 00001.jpg
-        		|-- ...
-        		|-- 00106.jpg
-      		|-- v_BaseballPitch_g01_c02
-      		|-- ...
-    	|-- valiation
+				|-- 00000.jpg
+				|-- 00001.jpg
+				|-- ...
+				|-- 00106.jpg
+			|-- v_BaseballPitch_g01_c02
+			|-- ...
+    		|-- valiation (141G)
 			|-- video_validation_0000001
 				|-- 00000.jpg
 				|-- ...
@@ -115,6 +115,7 @@ For THUMOS14, I have already made templates for train, validation and test data.
 In the case you have installed docker and nvidia-docker, and has download my Information folder and put it in THUMOS14:
 ```
 cd path-to-THUMOS14
+mkdir OpticalFlows
 mkdir OpticalFlows/train
 mkdir OpticalFlows/validation
 mkdir OpticalFlows/test
@@ -123,4 +124,10 @@ docker run --gpus all -it --name optical_flow --user 1000 -v path_to_THUMOS14:/d
 python multi_gpu_extract.py /data/Information/train_video_list.txt /data/OpticalFlows/train --out_fmt dir --log /data/Information/train.log --num_gpu 2
 python multi_gpu_extract.py /data/Information/validation_video_list.txt /data/OpticalFlows/validation --out_fmt dir --log /data/Information/validation.log --num_gpu 2
 python multi_gpu_extract.py /data/Information/test_video_list.txt /data/OpticalFlows/test --out_fmt dir --log /data/Information/test.log --num_gpu 2
+```
+
+## Check
+use below command to check the size of each dirctory if they are the same with me.
+```
+du -sh /path/to/dir
 ```
