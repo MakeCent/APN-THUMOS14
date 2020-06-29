@@ -121,6 +121,7 @@ import numpy as np
 action_detected = {}
 tps = {}
 for v, prediction in predictions.items():
+    prediction = ordinal2completeness(prediction)
     ads = action_search(prediction, min_T=50, max_T=30, min_L=40)
     action_detected[v] = ads
     tps[v] = calc_truepositive(ads, ground_truth[v], 0.5)
