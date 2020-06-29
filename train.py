@@ -31,7 +31,7 @@ default_config = dict(
     action="GolfSwing",
     agent=agent
 )
-wandb.init(config=default_config, name=now, notes='baseline:no ordinal no flow, train and val for train, no pretrain on imagenet.')
+wandb.init(config=default_config, name=now, notes='no ordinal no flow, pretrain on imagenet.')
 config = wandb.config
 wandbcb = WandbCallback(monitor='val_n_mae', save_model=False)
 
@@ -118,20 +118,14 @@ for v in video_names:
 # %% Detect actions
 import numpy as np
 from action_detection import action_search
+action_detected = {}
+tps = {}
+for v, prediction in predictions.items():
+    ads = action_search(prediction, min_T=50, max_T=30, min_L=40)
+    action_detected[v] = ads
+    tps[v] = calc_truepositive(ads, ground_truth[v], 0.5)
 
-aps = {}
-for min_T in range(55, 90 ,5):
-    for max_T in range(5, 45, 5):
-        for min_L in range(30, 100, 10):
-            action_detected = {}
-            tps = {}
-            for v, prediction in predictions.items():
-                ads = action_search(prediction, min_T=65, max_T=30, min_L=45)
-                action_detected[v] = ads
-                tps[v] = calc_truepositive(ads, ground_truth[v], 0.5)
-
-            num_gt = sum([len(gt) for gt in ground_truth.values()])
-            loss = np.vstack(list(action_detected.values()))[:, 2]
-            tp_values = np.hstack(list(tps.values()))
-            ap = average_precision(tp_values, num_gt, loss)
-            aps['{}-{}-{}'.format(min_L, max_T, min_L)] = ap
+num_gt = sum([len(gt) for gt in ground_truth.values()])
+loss = np.vstack(list(action_detected.values()))[:, 2]
+tp_values = np.hstack(list(tps.values()))
+ap = average_precision(tp_values, num_gt, loss)

@@ -73,7 +73,9 @@ n_mae = normalize_mae(y_range[1] - y_range[0])  # make mae loss normalized into 
 strategy = tf.distribute.MirroredStrategy()
 with strategy.scope():
     inputs = tf.keras.Input(shape=(224, 224, 20))
-    backbone = ResNet101(weights=None, input_shape=(224, 224, 20), pooling='avg', include_top=False)
+    backbone = ResNet101(weights='imagenet', input_shape=(224, 224, 3), pooling='avg', include_top=False)
+    weights = ResNet101.layers[1].get_weights()[0]
+    bias = ResNet101.layers[1].get_weights()[1]
     x = backbone(inputs)
     x = Dense(64, activation='relu', kernel_initializer='he_uniform')(x)
     x = Dropout(0.5)(x)

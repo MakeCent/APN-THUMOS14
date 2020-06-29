@@ -322,7 +322,7 @@ def mae_od(y_true, y_pred):
 
 def ordinal2completeness(array):
     import numpy as np
-    completeness = np.count_nonzero(array > 0.5)
+    completeness = np.count_nonzero(array > 0.5, axis=-1)
     return completeness
 
 
@@ -331,6 +331,7 @@ def multi_binarycrossentropy(y_true, y_pred):
     multi_ordinal_loss = tf.keras.losses.binary_crossentropy(y_true, y_pred)
     multi_ordinal_loss - tf.math.reduce_sum(multi_ordinal_loss)
     return multi_ordinal_loss
+
 
 def multi_od_metric(y_true, y_pred):
     import tensorflow as tf
