@@ -117,7 +117,7 @@ import numpy as np
 action_detected = {}
 tps = {}
 for v, prediction in predictions.items():
-    ads = action_search(prediction, min_T=65, max_T=30, min_L=35)
+    ads = action_search(prediction, min_T=50, max_T=30, min_L=40)
     action_detected[v] = ads
     tps[v] = calc_truepositive(ads, ground_truth[v], 0.5)
 
