@@ -6,6 +6,7 @@
 
 from load_data import *
 from utils import *
+from custom_class import BiasLayer
 from pathlib import Path
 from tensorflow.keras.applications import ResNet101
 from tensorflow.keras.layers import Dense, Dropout, Activation
