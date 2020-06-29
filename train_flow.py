@@ -81,7 +81,7 @@ with strategy.scope():
     backbone = ResNet101(weights=None, input_shape=(224, 224, 20), pooling='avg', include_top=False)
     backbone.layers[2].set_weights([extended_kernels, biases])
     for layer in pretrained.layers:
-        if layer.name != 'conv1_conv':
+        if layer.name != 'conv1_conv' and layer.get_weights() != []:
             backbone.get_layer(layer.name).set_weights(layer.get_weights())
     x = backbone(inputs)
     x = Dense(64, activation='relu', kernel_initializer='he_uniform')(x)
