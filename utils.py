@@ -357,7 +357,7 @@ def action_search(completeness_array, min_T, max_T, min_L):
     return np.array(action_detected).reshape(-1, 3)
 
 
-def replace_intermediate_layer_in_keras(model, layer_id, new_layer, training=None):
+def replace_intermediate_layer_in_keras(model, layer_id, new_layer, new_training=None, other_training=None):
     from tensorflow.keras.models import Model
 
     layers = [l for l in model.layers]
@@ -365,12 +365,15 @@ def replace_intermediate_layer_in_keras(model, layer_id, new_layer, training=Non
     x = layers[0].output
     for i in range(1, len(layers)):
         if i == layer_id:
-            if training is not None:
-                x = new_layer(x, training=training)
+            if new_training is not None:
+                x = new_layer(x, training=new_training)
             else:
                 x = new_layer(x)
         else:
-            x = layers[i](x)
+            if other_training is not None:
+                x = layers[i](x, training=other_training)
+            else:
+                x = layers[i](x)
 
     new_model = Model(input=layers[0].input, output=x)
     return new_model
