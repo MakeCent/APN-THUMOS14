@@ -32,7 +32,7 @@ default_config = dict(
     action="GolfSwing",
     agent=agent
 )
-wandb.init(config=default_config, name=now, notes='train with optical_flow (10), mse loss')
+wandb.init(config=default_config, name=now, notes='opf, mse, cross_modality_pre-trained on imagenet, 2048^2, dp 0.9')
 config = wandb.config
 wandbcb = WandbCallback(monitor='val_n_mae', save_model=False)
 
@@ -84,10 +84,10 @@ with strategy.scope():
         if layer.name != 'conv1_conv' and layer.get_weights() != []:
             backbone.get_layer(layer.name).set_weights(layer.get_weights())
     x = backbone(inputs)
-    x = Dense(64, activation='relu', kernel_initializer='he_uniform')(x)
-    x = Dropout(0.5)(x)
-    x = Dense(32, activation='relu', kernel_initializer='he_uniform')(x)
-    x = Dropout(0.5)(x)
+    x = Dense(2048, activation='relu', kernel_initializer='he_uniform')(x)
+    x = Dropout(0.9)(x)
+    x = Dense(2048, activation='relu', kernel_initializer='he_uniform')(x)
+    x = Dropout(0.9)(x)
     output = Dense(1, kernel_initializer='he_uniform')(x)
     model = Model(inputs, output)
     model_checkpoint = ModelCheckpoint(str(models_path.joinpath('{epoch:02d}-{val_n_mae:.2f}.h5')), period=5)
