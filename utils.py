@@ -33,7 +33,7 @@ def video2images(video_path, save_path, suffix='mp4'):
     from pathlib import Path
     import cv2
     videos = Path(video_path).glob('*.'+suffix)
-    save_path.mkdir(parents=True, exist_ok=True)
+    Path(save_path).mkdir(parents=True, exist_ok=True)
     for video in videos:
         image_path = Path(save_path, video.stem)
         image_path.mkdir()
