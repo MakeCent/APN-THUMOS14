@@ -91,7 +91,7 @@ mv Videos/TH14_test_set_mp4 Videos/test_mp4
 Download temporal annotations file handled by me with [link](https://drive.google.com/file/d/1Najcmh8J0LyHdgvXgLLzv0lXGhysOp3Q/view?usp=sharing). Compared with [original THUMO14 annotation files](https://www.crcv.ucf.edu/THUMOS14/download.html) which only annotate on seconds, we add temporal annotation files based on frame indexs. And we add temporal annotions for train dataset just for consistence since all train video are trimmed. Unzip it and put it into the THUMOS14 folder
 
 ### Download Information created by me:
-Information folder contain lots of useful text file which can be download from the [link](https://drive.google.com/file/d/1VIOZYN5BuCZsN5iZUSw6Sw-7QOTYWzco/view?usp=sharing). Please download it and unzip it and put it in THUMOS14 folder.
+Information folder contain lots of useful text file which can be download from the [link](https://drive.google.com/file/d/1HE67aVZEHjdd0onJF_ZEmR0Uo1Pax9ka/view?usp=sharing). Please download it and unzip it and put it in THUMOS14 folder.
 ## Convert videos to RGB (only videos of 20 classes localization action will be converted)
 Since we focus on detection only, video about classification without temporal annotation will not be transfered. If you further more want to remove all those video, you can **run belows to remove uninterested videos:**
 ```
