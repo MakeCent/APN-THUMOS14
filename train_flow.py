@@ -105,7 +105,6 @@ plot_history(history_path, history)
 
 # %% Prediction on untrimmed videos
 import pandas as pd
-import numpy as np
 temporal_annotation = pd.read_csv(annfile['test'], header=None)
 video_names = temporal_annotation.iloc[:, 0].unique()
 predictions = {}
@@ -118,7 +117,7 @@ for v in video_names:
     flow_list = find_flows(video_path)
     ds = stack_optical_flow(flow_list, batch_size=1, shuffle=False)
     prediction = model.predict(ds, verbose=1)
-
+    predictions[v] = prediction
 
 # %% Detect actions
 import numpy as np
