@@ -102,6 +102,7 @@ plot_history(history_path, history)
 
 # %% Prediction on untrimmed videos
 import pandas as pd
+import numpy as np
 temporal_annotation = pd.read_csv(annfile['test'], header=None)
 video_names = temporal_annotation.iloc[:, 0].unique()
 predictions = {}
@@ -114,10 +115,10 @@ for v in video_names:
     img_list = find_imgs(video_path)
     ds = build_dataset_from_slices(img_list, batch_size=1, shuffle=False)
     prediction = model.predict(ds, verbose=1)
+    predictions[v] = np.array([ordinal2completeness(p) for p in prediction])
     predictions[v] = prediction
 
 # %% Detect actions
-import numpy as np
 action_detected = {}
 tps = {}
 for v, prediction in predictions.items():
