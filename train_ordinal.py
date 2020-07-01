@@ -32,7 +32,7 @@ default_config = dict(
     action="GolfSwing",
     agent=agent
 )
-wandb.init(config=default_config, name=now, notes='+weighted, od, 2048^2, dp0.9')
+wandb.init(config=default_config, name=now, notes='change y_s to 1, add a fc2 layer, extend epoch to 50')
 config = wandb.config
 wandbcb = WandbCallback(monitor='val_n_mae', save_model=False)
 

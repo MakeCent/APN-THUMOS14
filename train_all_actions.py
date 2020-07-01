@@ -26,7 +26,7 @@ default_config = dict(
     y_s=1,
     y_e=100,
     learning_rate=0.0001,
-    batch_size=256,
+    batch_size=64,
     epochs=100,
     agent=agent
 )
@@ -58,11 +58,14 @@ history_path.mkdir(parents=True, exist_ok=True)
 models_path.mkdir(parents=True, exist_ok=True)
 
 # %% Build dataset
-
+def augment_func(x, y):
+    import tensorflow as tf
+    x = tf.image.random_flip_left_right(x)
+    return x, y
 datalist = {x: read_from_anndir(root[x], anndir[x], y_range, orinal=True) for x in ['train', 'val', 'test']}
 test_dataset = build_dataset_from_slices(*datalist['test'], batch_size=batch_size, shuffle=False)
 train_val_datalist = (datalist['train'][0]+datalist['val'][0], datalist['train'][1]+datalist['val'][1])
-train_val_dataset = build_dataset_from_slices(*train_val_datalist, batch_size=batch_size)
+train_val_dataset = build_dataset_from_slices(*train_val_datalist, batch_size=batch_size, augment=augment_func)
 # %% Build and compile model
 strategy = tf.distribute.MirroredStrategy()
 with strategy.scope():

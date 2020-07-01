@@ -34,8 +34,8 @@ class BiasLayer(tf.keras.layers.Layer):
         config.update({'units': self.units,})
         return config
 
-    def call(self, input):
-        return input + self.bias
+    def call(self, inputs):
+        return tf.repeat(tf.expand_dims(inputs, -1), self.units, axis=-1) + self.bias
 
 
 class RGBLossCallback(tf.keras.callbacks.Callback):
