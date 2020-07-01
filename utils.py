@@ -301,17 +301,34 @@ def ordinal2completeness(array):
 
 def multi_binarycrossentropy(y_true, y_pred):
     import tensorflow as tf
+    # May need manually set for simplicity, otherwise you may need to warp this function with a new function.
+    y_nums = tf.constant(100, dtype=tf.int64)
+    # change y_true to int used for indexing
+    y_true = tf.cast(y_true, tf.int64)
+    # indexing row of y_pred by action index stored in y_true. [batch_size, action_num, y_nums] --> [batch_size, y_nums]
+    y_pred = tf.gather_nd(y_pred, y_true[:, 0, :], batch_dims=1)
+    # convert int completeness to ordinal vector. [batch_size, 2, 1] --> [batch_size, y_nums]
+    y_true = tf.map_fn(
+        lambda x: tf.concat([tf.repeat(tf.constant(1, dtype=tf.int64), x), tf.repeat(tf.constant(0, dtype=tf.int64), y_nums - x)], axis=0),
+        y_true[:, 1, :])
     multi_ordinal_loss = tf.keras.losses.binary_crossentropy(y_true, y_pred)
-    multi_ordinal_loss - tf.math.reduce_sum(multi_ordinal_loss)
     return multi_ordinal_loss
 
 
 def multi_od_metric(y_true, y_pred):
     import tensorflow as tf
-    predict_completeness = tf.math.count_nonzero(y_pred > 0.5, axis=-1)
-    true_completeness = tf.math.count_nonzero(y_true > 0.5, axis=-1)
-    multi_ordinal_loss = tf.keras.losses.binary_crossentropy(true_completeness, predict_completeness)
-    return multi_ordinal_loss
+    # change y_true to int used for indexing
+    y_true = tf.cast(y_true, tf.int64)
+    # ordinal to int. [batch_size, action_num, y_nums] --> [batch_size, action_num]
+    y_pred = tf.math.count_nonzero(y_pred > 0.5, axis=-1, dtype=tf.dtypes.float64)
+    # indexing row of y_pred by action index.  [batch_size, action_num] --> [batch_size]
+    y_pred = tf.gather_nd(y_pred, y_true[:, 0, :], batch_dims=1)
+    # only keep completeness values of y_true. [batch_size, 2, 1] --> [batch_size]
+    y_true = tf.squeeze(y_true[:, 1, :])
+    # # change back y_true to float used for compute loss
+    y_true = tf.cast(y_true, tf.float64)
+    multi_mae_od = tf.math.abs(y_true - y_pred)
+    return multi_mae_od
 
 
 def action_search(completeness_array, min_T, max_T, min_L):

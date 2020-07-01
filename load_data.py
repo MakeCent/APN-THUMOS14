@@ -17,36 +17,46 @@ def format_img(image, label=None):
         return image, label
 
 
-def generate_labels(length, y_range, ordinal=False):
+def generate_labels(length, y_range, ordinal=False, multi_action=False, action_index=0):
+    """
+    Given number of frames of a trimmed action video. Return a label array monotonically increasing in y_range.
+    Mainly based on numpy.linspace function
+    :param length:
+        Int. Number of completeness labels need to be generate.
+    :param y_range:
+        Tuple. Range of the completeness label values vary in.
+    :param ordinal:
+        Boolean. If True, then each completeness label will be convert to a ordinal vector. e.g. 3 -> [1,1,1,0,0,...]
+    :param multi_action:
+        Boolean. Since in multi_task case ordinal label vector will be too large (20 X 100), hence take too much space
+        to store. Therefore in this case each label will be set as single value even ordinal is True. The vector
+        transfer will be conducted on loss and metric function instead. To identify the action class, each label will be
+        along with a action index.
+    :param action_index:
+        Int. Identify the action class of correspond label
+    :return:
+        Array.
+    """
     import numpy as np
     y_nums = y_range[1] - y_range[0] + 1
     completeness = np.linspace(*y_range, num=length, dtype=np.float32)
     if ordinal:
-        rounded_completeness = np.round(completeness)
+        rounded_completeness = np.round(completeness).astype(np.int)
         ordinal_completeness = np.array([[1] * int(c) + [0] * int(y_nums - c) for c in rounded_completeness],
                                         dtype=np.float32)
-        return ordinal_completeness
+        if multi_action:
+            return np.expand_dims(np.insert(rounded_completeness[..., np.newaxis], 0, action_index, axis=1), axis=-1)
+        else:
+            return ordinal_completeness
     else:
-        return completeness
+        if multi_action:
+            return np.insert(completeness[..., np.newaxis], 1, action_index, axis=1)
+        else:
+            return completeness
 
 
-def generate_multitask_labels(length, y_range, action_num, ordinal=False):
-    import numpy as np
-    y_nums = y_range[1] - y_range[0] + 1
-    completeness = np.linspace(*y_range, num=length, dtype=np.float32)
-    multitask_completeness = np.array([[c] + [0] * (y_nums - 1) for c in completeness])
-    if ordinal:
-        rounded_completeness = np.round(completeness)
-        ordinal_completeness = np.array([[1] * int(c) + [0] * int(y_nums - c) for c in rounded_completeness],
-                                        dtype=np.float32)
-        multitask_ordinal_completeness = np.array(
-            [np.pad(np.expand_dims(odc, 0), [(0, action_num - 1), (0, 0)]) for odc in ordinal_completeness])
-        return multitask_ordinal_completeness
-    else:
-        return multitask_completeness
-
-
-def read_from_annfile(root, annfile, y_range, mode='rgb', ordinal=False, stack_length=10, label_func=generate_labels):
+def read_from_annfile(root, annfile, y_range, mode='rgb', ordinal=False,
+                      stack_length=10, multi_action=False, action_index=0):
     """
     According to the temporal annotation file. Create list of image paths and list of labels.
     :param root: String. Directory where all images are stored.
@@ -64,7 +74,7 @@ def read_from_annfile(root, annfile, y_range, mode='rgb', ordinal=False, stack_l
             action_length = row.values[2] + 1 - row.values[1]
             img_paths.extend(["{}/{}/{}.jpg".format(root, row.values[0], str(num).zfill(5)) for num in
                               np.arange(row.values[1], row.values[2] + 1)])
-            labels.extend(label_func(action_length, y_range=y_range, ordinal=ordinal))
+            labels.extend(generate_labels(action_length, y_range=y_range, ordinal=ordinal, multi_action=multi_action))
         return img_paths, labels
 
     elif mode == 'flow':
@@ -75,12 +85,12 @@ def read_from_annfile(root, annfile, y_range, mode='rgb', ordinal=False, stack_l
         stacked_flow_list = []
         for v_fl in flow_paths:
             v_stacked_flow = [v_fl[2 * i:2 * i + stack_length * 2] for i in range(0, len(v_fl) // 2 - stack_length + 1)]
-            labels.extend(label_func(len(v_stacked_flow), y_range=y_range, ordinal=ordinal))
+            labels.extend(generate_labels(len(v_stacked_flow), y_range, ordinal, multi_action, action_index))
             stacked_flow_list.extend(v_stacked_flow)
         return stacked_flow_list, labels
 
 
-def read_from_anndir(root, anndir, y_range, mode='rgb', orinal=False, stack_length=10):
+def read_from_anndir(root, anndir, y_range, mode='rgb', orinal=False, stack_length=10, multi_action=True):
     """
     According to the temporal annotation file. Create list of image paths and list of labels.
     :param root: String. Directory where all images are stored.
@@ -90,9 +100,16 @@ def read_from_anndir(root, anndir, y_range, mode='rgb', orinal=False, stack_leng
     """
     from pathlib import Path
 
+    action_idx = {'BaseballPitch': 0, 'BasketballDunk': 1, 'Billiards': 2, 'CleanAndJerk': 3, 'CliffDiving': 4,
+                  'CricketBowling': 5, 'CricketShot': 6, 'Diving': 7, 'FrisbeeCatch': 8, 'GolfSwing': 9,
+                  'HammerThrow': 10, 'HighJump': 11, 'JavelinThrow': 12, 'LongJump': 13, 'PoleVault': 14, 'Shotput': 15,
+                  'SoccerPenalty': 16, 'TennisSwing': 17, 'ThrowDiscus': 18, 'VolleyballSpiking': 19}
+
     datalist, ylist = [], []
-    for annfile in Path(anndir).iterdir():
-        action_list, label_list = read_from_annfile(root, str(annfile), y_range, mode, orinal, stack_length)
+    for annfile in sorted(Path(anndir).iterdir()):
+        action_name = str(annfile.stem).split('_')[0]
+        action_list, label_list = read_from_annfile(root, str(annfile), y_range, mode, orinal, stack_length,
+                                                    multi_action, action_idx[action_name])
         datalist.extend(action_list)
         ylist.extend(label_list)
     return datalist, ylist
