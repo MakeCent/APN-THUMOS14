@@ -7,14 +7,16 @@
 # %% Special Function: Can only be used in this program. Most of them aim to make main file more concise.
 
 
-def format_img(image, label=None):
+def format_img(image, label=None, weight=None):
     import tensorflow as tf
     image = (image / 127.5) - 1
     image = tf.image.resize(image, (224, 224))
     if label is None:
         return image
-    else:
+    elif weight is None:
         return image, label
+    else:
+        return image, label, weight
 
 
 def generate_labels(length, y_range, ordinal=False):
@@ -30,23 +32,8 @@ def generate_labels(length, y_range, ordinal=False):
         return completeness
 
 
-def generate_multitask_labels(length, y_range, action_num, ordinal=False):
-    import numpy as np
-    y_nums = y_range[1] - y_range[0] + 1
-    completeness = np.linspace(*y_range, num=length, dtype=np.float32)
-    multitask_completeness = np.array([[c] + [0] * (y_nums - 1) for c in completeness])
-    if ordinal:
-        rounded_completeness = np.round(completeness)
-        ordinal_completeness = np.array([[1] * int(c) + [0] * int(y_nums - c) for c in rounded_completeness],
-                                        dtype=np.float32)
-        multitask_ordinal_completeness = np.array(
-            [np.pad(np.expand_dims(odc, 0), [(0, action_num - 1), (0, 0)]) for odc in ordinal_completeness])
-        return multitask_ordinal_completeness
-    else:
-        return multitask_completeness
-
-
-def read_from_annfile(root, annfile, y_range, mode='rgb', ordinal=False, stack_length=10, label_func=generate_labels):
+def read_from_annfile(root, annfile, y_range, mode='rgb', ordinal=False,
+                      stack_length=10, label_func=generate_labels, weighted=False):
     """
     According to the temporal annotation file. Create list of image paths and list of labels.
     :param root: String. Directory where all images are stored.
@@ -59,13 +46,19 @@ def read_from_annfile(root, annfile, y_range, mode='rgb', ordinal=False, stack_l
     temporal_annotations = pd.read_csv(annfile, header=None)
 
     if mode == 'rgb':
-        img_paths, labels = [], []
+        img_paths, labels, weights = [], [], []
         for i_r, row in temporal_annotations.iterrows():
             action_length = row.values[2] + 1 - row.values[1]
             img_paths.extend(["{}/{}/{}.jpg".format(root, row.values[0], str(num).zfill(5)) for num in
                               np.arange(row.values[1], row.values[2] + 1)])
             labels.extend(label_func(action_length, y_range=y_range, ordinal=ordinal))
-        return img_paths, labels
+            if weighted:
+                w_10 = [3, 2, 1, 1, 1, 1, 1, 1, 2, 3]
+                weights.extend(np.hstack([w*p for w, p in zip(w_10, np.array_split(np.ones(action_length), 10))]))
+        if weighted:
+            return img_paths, labels, weights
+        else:
+            return img_paths, labels
 
     elif mode == 'flow':
         flow_paths, labels = [], []
@@ -101,7 +94,7 @@ def read_from_anndir(root, anndir, y_range, mode='rgb', orinal=False, stack_leng
 # %% Basic function: Can be easily used in other programs.
 
 
-def decode_img(file_path, label=None):
+def decode_img(file_path, label=None, weight=None):
     """
     Read image from path
     :param label: Unknown.
@@ -114,11 +107,13 @@ def decode_img(file_path, label=None):
     img = tf.cast(img, tf.float32)
     if label is None:
         return img
-    else:
+    elif weight is None:
         return img, label
+    else:
+        return img, label, weight
 
 
-def build_dataset_from_slices(data_list, labels_list=None, batch_size=32, augment=None, shuffle=True, prefetch=True):
+def build_dataset_from_slices(data_list, labels_list=None, weighs=None, batch_size=32, augment=None, shuffle=True, prefetch=True):
     """
     Given image paths and labels, create tf.data.Dataset instance.
     :param data_list: List. Consists of strings. Each string is a path of one image.
@@ -130,8 +125,10 @@ def build_dataset_from_slices(data_list, labels_list=None, batch_size=32, augmen
     AUTOTUNE = tf.data.experimental.AUTOTUNE
     if labels_list is None:
         dataset = tf.data.Dataset.from_tensor_slices(data_list)
-    else:
+    elif weighs is None:
         dataset = tf.data.Dataset.from_tensor_slices((data_list, labels_list))
+    else:
+        dataset = tf.data.Dataset.from_tensor_slices((data_list, labels_list, weighs))
     if shuffle:
         dataset = dataset.shuffle(len(data_list))
     dataset = dataset.map(decode_img, num_parallel_calls=AUTOTUNE)

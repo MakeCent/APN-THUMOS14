@@ -289,7 +289,7 @@ def mae_od(y_true, y_pred):
     import tensorflow as tf
     predict_completeness = tf.math.count_nonzero(y_pred > 0.5, axis=-1)
     true_completeness = tf.math.count_nonzero(y_true > 0.5, axis=-1)
-    mean_absolute_error = tf.math.reduce_mean(tf.math.abs(predict_completeness - true_completeness), axis=-1)
+    mean_absolute_error = tf.math.abs(predict_completeness - true_completeness)
     return mean_absolute_error
 
 

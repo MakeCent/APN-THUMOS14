@@ -15,13 +15,13 @@ action = "GolfSwing"
 y_range = (1, 100)
 n_mae = normalize_mae(y_range[1] - y_range[0] + 1)
 
-rgb_model_path = "/mnt/louis-consistent/Saved/THUMOS14_output/GolfSwing/Model/2020-06-28-16:41:40/50-21.90.h5"
+rgb_model_path = "/mnt/louis-consistent/Saved/THUMOS14_output/GolfSwing/Model/2020-07-01-01:18:02/50-24.19.h5"
 # rgb_video_path = "/mnt/louis-consistent/Datasets/THUMOS14/Images/test/video_test_0000028"
 # rgb_img_list = find_imgs(rgb_video_path)
 # rgb_untrimmed_video = build_dataset_from_slices(rgb_img_list, batch_size=1, shuffle=False)
 
 ordinal = True
-flow_model_path = "/mnt/louis-consistent/Saved/THUMOS14_output/GolfSwing/Model/2020-06-27-22:40:51/50-23.65.h5"
+flow_model_path = "/mnt/louis-consistent/Saved/THUMOS14_output/GolfSwing/50-22.09.h5"
 # flow_video_path = "/mnt/louis-consistent/Datasets/THUMOS14/OpticalFlows/test/video_test_0000028"
 # flow_img_list = find_flows(flow_video_path)
 # flow_untrimmed_video = stack_optical_flow(flow_img_list, batch_size=1, shuffle=False)
@@ -72,7 +72,7 @@ flow_test_records = FLowLossCallback()
 
 # %% Prediction on trimmed videos and single untrimmed video
 with strategy.scope():
-    rgb_model = tf.keras.models.load_model(rgb_model_path, compile=False)
+    rgb_model = tf.keras.models.load_model(rgb_model_path, compile=False, custom_objects={'BiasLayer': BiasLayer})
     rgb_model.compile(loss=rgb_loss, metrics=[rgb_metric])
     # rgb_train_prediction = rgb_model.predict(rgb_train_dataset, verbose=1)
     # rgb_val_prediction = rgb_model.predict(rgb_val_dataset, verbose=1)
@@ -141,20 +141,22 @@ for v, prediction in rgb_untrimmed_predictions.items():
 rgb_loss = np.vstack(list(rgb_action_detected.values()))[:, 2]
 rgb_tp_values = np.hstack(list(rgb_tps.values()))
 rgb_ap = average_precision(rgb_tp_values, num_gt, rgb_loss)
-
+plot_prediction(prediction)
+plot_detection(prediction, gt, ads)
 
 flow_action_detected = {}
 flow_tps = {}
 for v, prediction in flow_untrimmed_predictions.items():
-    ads = action_search(prediction, min_T=50, max_T=30, min_L=40)
+    ads = action_search(prediction, min_T=80, max_T=30, min_L=100)
     flow_action_detected[v] = ads
     flow_tps[v] = calc_truepositive(ads, ground_truth[v], iou)
 
 flow_loss = np.vstack(list(flow_action_detected.values()))[:, 2]
 flow_tp_values = np.hstack(list(flow_tps.values()))
 flow_ap = average_precision(flow_tp_values, num_gt, flow_loss)
-
-
+plot_prediction(prediction)
+plot_detection(prediction, gt, ads)
+# Fused by take mean of prediction rgb and flow
 fused_action_detected = {}
 fused_tps = {}
 for v, prediction in fused_untrimmed_predictions.items():
@@ -165,6 +167,11 @@ for v, prediction in fused_untrimmed_predictions.items():
 fused_loss = np.vstack(list(fused_action_detected.values()))[:, 2]
 fused_tp_values = np.hstack(list(fused_tps.values()))
 fused_ap = average_precision(fused_tp_values, num_gt, fused_loss)
+
+plot_prediction(prediction)
+plot_detection(prediction, gt, ads)
+# Fused by deleted detections not intersect with each other
+
 # %% Single untrimmed video detection
 # rgb_ads = action_search(rgb_video_prediction, min_T=50, max_T=30, min_L=35)
 # rgb_ads = np.array(rgb_ads)

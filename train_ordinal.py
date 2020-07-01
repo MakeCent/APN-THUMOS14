@@ -20,7 +20,7 @@ from custom_class import BiasLayer
 agent = socket.gethostname()
 AUTOTUNE = tf.data.experimental.AUTOTUNE
 fix_bug()
-now = datetime.datetime.now().strftime("%Y-%m-%d-%H:%M:%S")
+now = datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
 # %% wandb Initialization
 default_config = dict(
     loss='binary_crossentropy',
@@ -32,7 +32,7 @@ default_config = dict(
     action="GolfSwing",
     agent=agent
 )
-wandb.init(config=default_config, name=now, notes='change y_s to 1, add a fc2 layer, extend epoch to 50')
+wandb.init(config=default_config, name=now, notes='+weighted, od, 2048^2, dp0.9')
 config = wandb.config
 wandbcb = WandbCallback(monitor='val_n_mae', save_model=False)
 
@@ -69,9 +69,9 @@ models_path.mkdir(parents=True, exist_ok=True)
 #     x = tf.image.random_flip_left_right(x)
 #     return x, y
 
-datalist = {x: read_from_annfile(root[x], annfile[x], y_range, ordinal=True) for x in ['train', 'val', 'test']}
+datalist = {x: read_from_annfile(root[x], annfile[x], y_range, ordinal=True, weighted=True) for x in ['train', 'val', 'test']}
+train_val_datalist = (datalist['train'][0]+datalist['val'][0], datalist['train'][1]+datalist['val'][1], datalist['train'][2]+datalist['val'][2])
 test_dataset = build_dataset_from_slices(*datalist['test'], batch_size=batch_size, shuffle=False)
-train_val_datalist = (datalist['train'][0]+datalist['val'][0], datalist['train'][1]+datalist['val'][1])
 train_val_dataset = build_dataset_from_slices(*train_val_datalist, batch_size=batch_size)
 # %% Build and compile model
 strategy = tf.distribute.MirroredStrategy()
@@ -80,9 +80,9 @@ with strategy.scope():
     backbone = ResNet101(weights='imagenet', input_shape=(224, 224, 3), pooling='avg', include_top=False)
     x = backbone(inputs)
     x = Dense(2048, activation='relu', kernel_initializer='he_uniform')(x)
-    x = Dropout(0.5)(x)
+    x = Dropout(0.9)(x)
     x = Dense(2048, activation='relu', kernel_initializer='he_uniform')(x)
-    x = Dropout(0.5)(x)
+    x = Dropout(0.9)(x)
     x = Dense(1, kernel_initializer='he_uniform', use_bias=False)(x)
     x = BiasLayer(y_nums)(x)
     output = Activation('sigmoid')(x)
@@ -115,7 +115,6 @@ for v in video_names:
     img_list = find_imgs(video_path)
     ds = build_dataset_from_slices(img_list, batch_size=1, shuffle=False)
     prediction = model.predict(ds, verbose=1)
-    predictions[v] = np.array([ordinal2completeness(p) for p in prediction])
     predictions[v] = prediction
 
 # %% Detect actions

@@ -20,7 +20,7 @@ import socket
 agent = socket.gethostname()
 AUTOTUNE = tf.data.experimental.AUTOTUNE
 fix_bug()
-now = datetime.datetime.now().strftime("%Y-%m-%d-%H:%M:%S")
+now = datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
 # %% wandb Initialization
 default_config = dict(
     loss='mse',
