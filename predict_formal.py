@@ -11,7 +11,7 @@ from load_data import *
 from utils import *
 from custom_class import BiasLayer
 action = "GolfSwing"
-model_path = "/mnt/louis-consistent/Saved/THUMOS14_output/GolfSwing/50-21.79.h5"
+model_path = "/mnt/louis-consistent/Saved/THUMOS14_output/GolfSwing/Model/2020-07-01-01:18:02/50-24.19.h5"
 ordinal = True
 annfile = "/mnt/louis-consistent/Datasets/THUMOS14/Annotations/test/annotationF/{}_testF.csv".format(action)
 temporal_annotation = pd.read_csv(annfile, header=None)

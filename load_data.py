@@ -58,7 +58,7 @@ def generate_labels(length, y_range, ordinal=False, multi_action=False, action_i
 
 
 def read_from_annfile(root, annfile, y_range, mode='rgb', ordinal=False,
-                      stack_length=10, multi_action=False, action_index=0):
+                      stack_length=10, multi_action=False, action_index=0, weighted=False):
     """
     According to the temporal annotation file. Create list of image paths and list of labels.
     :param root: String. Directory where all images are stored.
@@ -77,12 +77,9 @@ def read_from_annfile(root, annfile, y_range, mode='rgb', ordinal=False,
             img_paths.extend(["{}/{}/{}.jpg".format(root, row.values[0], str(num).zfill(5)) for num in
                               np.arange(row.values[1], row.values[2] + 1)])
             labels.extend(generate_labels(action_length, y_range=y_range, ordinal=ordinal, multi_action=multi_action))
-        return img_paths, labels
-            labels.extend(label_func(action_length, y_range=y_range, ordinal=ordinal))
-            if weighted:
-                w_10 = [3, 2, 1, 1, 1, 1, 1, 1, 2, 3]
-                weights.extend(np.hstack([w*p for w, p in zip(w_10, np.array_split(np.ones(action_length), 10))]))
         if weighted:
+            w_10 = [3, 2, 1, 1, 1, 1, 1, 1, 2, 3]
+            weights.extend(np.hstack([w*p for w, p in zip(w_10, np.array_split(np.ones(action_length), 10))]))
             return img_paths, labels, weights
         else:
             return img_paths, labels
