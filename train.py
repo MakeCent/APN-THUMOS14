@@ -31,7 +31,7 @@ default_config = dict(
     action="GolfSwing",
     agent=agent
 )
-wandb.init(config=default_config, name=now, notes='fc-(2048, 0248) with dp 0.9')
+wandb.init(config=default_config, name=now, notes='no ordinal no flow, pretrain on imagenet, change fc layer to 2048, 2048 to be the same as in ordinal')
 config = wandb.config
 wandbcb = WandbCallback(monitor='val_n_mae', save_model=False)
 
@@ -81,9 +81,9 @@ with strategy.scope():
     backbone = ResNet101(weights='imagenet', input_shape=(224, 224, 3), pooling='avg', include_top=False)
     x = backbone(inputs)
     x = Dense(2048, activation='relu', kernel_initializer='he_uniform')(x)
-    x = Dropout(0.9)(x)
+    x = Dropout(0.5)(x)
     x = Dense(2048, activation='relu', kernel_initializer='he_uniform')(x)
-    x = Dropout(0.9)(x)
+    x = Dropout(0.5)(x)
     output = Dense(1, kernel_initializer='he_uniform')(x)
     model = Model(inputs, output)
     model_checkpoint = ModelCheckpoint(str(models_path.joinpath('{epoch:02d}-{val_n_mae:.2f}.h5')), period=5)

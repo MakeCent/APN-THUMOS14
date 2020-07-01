@@ -9,7 +9,7 @@ from utils import *
 from pathlib import Path
 import numpy as np
 from tensorflow.keras.applications import ResNet101
-from tensorflow.keras.layers import Dense, Dropout
+from tensorflow.keras.layers import Dense, Dropout, BatchNormalization
 from tensorflow.keras import Model
 from tensorflow.keras.callbacks import ModelCheckpoint, LearningRateScheduler
 import wandb
@@ -32,7 +32,7 @@ default_config = dict(
     action="GolfSwing",
     agent=agent
 )
-wandb.init(config=default_config, name=now, notes='opf, mse, cross_modality_pre-trained on imagenet, 2048^2, dp 0.9')
+wandb.init(config=default_config, name=now, notes='+pBN; opf, mse, cross_modality_pre-trained on imagenet, 2048^2, dp 0.9')
 config = wandb.config
 wandbcb = WandbCallback(monitor='val_n_mae', save_model=False)
 
@@ -68,17 +68,24 @@ datalist = {x: read_from_annfile(root[x], annfile[x], y_range, mode='flow') for 
 test_dataset = stack_optical_flow(*datalist['test'], batch_size=batch_size, shuffle=False)
 train_val_datalist = (datalist['train'][0]+datalist['val'][0], datalist['train'][1]+datalist['val'][1])
 train_val_dataset = stack_optical_flow(*train_val_datalist, batch_size=batch_size)
-
 # %% Build and compile model
 n_mae = normalize_mae(y_range[1] - y_range[0])  # make mae loss normalized into range 0 - 100.
 strategy = tf.distribute.MirroredStrategy()
+
 pretrained = ResNet101(weights='imagenet', input_shape=(224, 224, 3), pooling='avg', include_top=False)
 weights = pretrained.layers[2].get_weights()[0]
 biases = pretrained.layers[2].get_weights()[1]
 extended_kernels = np.repeat(weights.mean(axis=2)[:, :, np.newaxis], 20, axis=2)
+
+
+def bn_factory():
+    return BatchNormalization(name='conv1_bn')
+
+
 with strategy.scope():
     inputs = tf.keras.Input(shape=(224, 224, 20))
     backbone = ResNet101(weights=None, input_shape=(224, 224, 20), pooling='avg', include_top=False)
+    backbone = insert_layer_nonseq(backbone, 'conv1_bn', bn_factory, position='replace', new_training=True, other_training=False)
     backbone.layers[2].set_weights([extended_kernels, biases])
     for layer in pretrained.layers:
         if layer.name != 'conv1_conv' and layer.get_weights() != []:

@@ -6,9 +6,10 @@
 
 from load_data import *
 from utils import *
+import numpy as np
 from pathlib import Path
 from tensorflow.keras.applications import ResNet101
-from tensorflow.keras.layers import Dense, Dropout, Activation
+from tensorflow.keras.layers import Dense, Dropout, Activation, BatchNormalization
 from tensorflow.keras import Model
 from tensorflow.keras.callbacks import ModelCheckpoint, LearningRateScheduler
 import wandb
@@ -32,7 +33,7 @@ default_config = dict(
     action="GolfSwing",
     agent=agent
 )
-wandb.init(config=default_config, name=now, notes='train with flow and ordinal regression')
+wandb.init(config=default_config, name=now, notes='opf, od, 256^2, dp0.5')
 config = wandb.config
 wandbcb = WandbCallback(monitor='val_n_mae', save_model=False)
 
@@ -70,13 +71,29 @@ train_val_datalist = (datalist['train'][0]+datalist['val'][0], datalist['train']
 train_val_dataset = stack_optical_flow(*train_val_datalist, batch_size=batch_size)
 # %% Build and compile model
 strategy = tf.distribute.MirroredStrategy()
+
+pretrained = ResNet101(weights='imagenet', input_shape=(224, 224, 3), pooling='avg', include_top=False)
+weights = pretrained.layers[2].get_weights()[0]
+biases = pretrained.layers[2].get_weights()[1]
+extended_kernels = np.repeat(weights.mean(axis=2)[:, :, np.newaxis], 20, axis=2)
+
+
+def bn_factory():
+    return BatchNormalization(name='conv1_bn')
+
+
 with strategy.scope():
     inputs = tf.keras.Input(shape=(224, 224, 20))
     backbone = ResNet101(weights=None, input_shape=(224, 224, 20), pooling='avg', include_top=False)
+    backbone = insert_layer_nonseq(backbone, 'conv1_bn', bn_factory, position='replace', new_training=True, other_training=False)
+    backbone.layers[2].set_weights([extended_kernels, biases])
+    for layer in pretrained.layers:
+        if layer.name != 'conv1_conv' and layer.get_weights() != []:
+            backbone.get_layer(layer.name).set_weights(layer.get_weights())
     x = backbone(inputs)
-    x = Dense(2048, activation='relu', kernel_initializer='he_uniform')(x)
+    x = Dense(256, activation='relu', kernel_initializer='he_uniform')(x)
     x = Dropout(0.5)(x)
-    x = Dense(2048, activation='relu', kernel_initializer='he_uniform')(x)
+    x = Dense(256, activation='relu', kernel_initializer='he_uniform')(x)
     x = Dropout(0.5)(x)
     x = Dense(1, kernel_initializer='he_uniform', use_bias=False)(x)
     x = BiasLayer(y_nums)(x)
@@ -110,7 +127,7 @@ for v in video_names:
     flow_list = find_flows(video_path)
     ds = stack_optical_flow(flow_list, batch_size=1, shuffle=False)
     prediction = model.predict(ds, verbose=1)
-    predictions[v] = np.array([ordinal2completeness(p) for p in prediction])
+    predictions[v] = prediction
 
 # %% Detect actions
 import numpy as np
@@ -118,7 +135,7 @@ action_detected = {}
 tps = {}
 for v, prediction in predictions.items():
     prediction = ordinal2completeness(prediction)
-    ads = action_search(prediction, min_T=50, max_T=30, min_L=40)
+    ads = action_search(prediction, min_T=80, max_T=30, min_L=100)
     action_detected[v] = ads
     tps[v] = calc_truepositive(ads, ground_truth[v], 0.5)
 
