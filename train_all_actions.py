@@ -6,7 +6,7 @@
 
 from load_data import *
 from utils import *
-from custom_class import BiasLayer
+from custom_class import MultiAction_BiasLayer
 from pathlib import Path
 from tensorflow.keras.applications import ResNet101
 from tensorflow.keras.layers import Dense, Dropout, Activation
@@ -77,7 +77,7 @@ with strategy.scope():
     x = Dense(1024, activation='relu', kernel_initializer='he_uniform')(x)
     x = Dropout(0.5)(x)
     x = Dense(action_num, kernel_initializer='he_uniform', use_bias=False)(x)
-    x = BiasLayer(y_nums)(x)
+    x = MultiAction_BiasLayer(y_nums)(x)
     output = Activation('sigmoid')(x)
     model = Model(inputs, output)
     model_checkpoint = ModelCheckpoint(str(models_path.joinpath('{epoch:02d}-{val_mae_od:.2f}.h5')), period=5)

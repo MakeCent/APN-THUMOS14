@@ -113,7 +113,7 @@ for v in video_names:
     img_list = find_imgs(video_path)
     ds = build_dataset_from_slices(img_list, batch_size=1, shuffle=False)
     prediction = model.predict(ds, verbose=1)
-    predictions[v] = prediction
+    predictions[v] = np.squeeze(prediction)
 
 # %% Detect actions
 import numpy as np

@@ -32,7 +32,7 @@ default_config = dict(
     action="GolfSwing",
     agent=agent
 )
-wandb.init(config=default_config, name=now, notes='strong weighted')
+wandb.init(config=default_config, name=now, notes='test one cycle')
 config = wandb.config
 wandbcb = WandbCallback(monitor='val_n_mae', save_model=False)
 
@@ -69,8 +69,8 @@ models_path.mkdir(parents=True, exist_ok=True)
 #     x = tf.image.random_flip_left_right(x)
 #     return x, y
 
-datalist = {x: read_from_annfile(root[x], annfile[x], y_range, ordinal=True, weighted=True) for x in ['train', 'val', 'test']}
-train_val_datalist = (datalist['train'][0]+datalist['val'][0], datalist['train'][1]+datalist['val'][1], datalist['train'][2]+datalist['val'][2])
+datalist = {x: read_from_annfile(root[x], annfile[x], y_range, ordinal=True) for x in ['train', 'val', 'test']}
+train_val_datalist = (datalist['train'][0]+datalist['val'][0], datalist['train'][1]+datalist['val'][1])
 test_dataset = build_dataset_from_slices(*datalist['test'], batch_size=batch_size, shuffle=False)
 train_val_dataset = build_dataset_from_slices(*train_val_datalist, batch_size=batch_size)
 # %% Build and compile model
@@ -92,7 +92,8 @@ with strategy.scope():
     # %% Fine tune
     backbone.trainable = True
     model.compile(loss=loss, optimizer=tf.keras.optimizers.Adam(learning_rate), metrics=[mae_od])
-    ftune_his = model.fit(train_val_dataset, validation_data=test_dataset, epochs=epochs,
+
+ftune_his = model.fit(train_val_dataset, validation_data=test_dataset, epochs=epochs,
                           callbacks=[model_checkpoint, wandbcb, lr_sche], verbose=1)
 
 # %% Save history to csv and images
@@ -115,7 +116,7 @@ for v in video_names:
     img_list = find_imgs(video_path)
     ds = build_dataset_from_slices(img_list, batch_size=1, shuffle=False)
     prediction = model.predict(ds, verbose=1)
-    predictions[v] = prediction
+    predictions[v] = np.squeeze(prediction)
 
 # %% Detect actions
 action_detected = {}

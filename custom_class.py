@@ -25,6 +25,26 @@ class BiasLayer(tf.keras.layers.Layer):
 
     def build(self, input_shape):
         self.bias = self.add_weight('bias',
+                                    shape=self.units,
+                                    initializer='zeros',
+                                    trainable=True)
+
+    def get_config(self):
+        config = super().get_config().copy()
+        config.update({'units': self.units,})
+        return config
+
+    def call(self, inputs):
+        return inputs + self.bias
+
+
+class MultiAction_BiasLayer(tf.keras.layers.Layer):
+    def __init__(self, units, *args, **kwargs):
+        super(MultiAction_BiasLayer, self).__init__(*args, **kwargs)
+        self.units = units
+
+    def build(self, input_shape):
+        self.bias = self.add_weight('bias',
                                     shape=(input_shape[-1], self.units),
                                     initializer='zeros',
                                     trainable=True)
