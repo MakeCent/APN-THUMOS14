@@ -58,51 +58,55 @@ def generate_labels(length, y_range, ordinal=False, multi_action=False, action_i
 
 
 def read_from_annfile(root, annfile, y_range, mode='rgb', ordinal=False,
-                      stack_length=10, multi_action=False, action_index=0, weighted=False):
+                      stack_length=1, multi_action=False, action_index=0, weighted=False):
     """
-    According to the temporal annotation file. Create list of image paths and list of labels.
+    According to the temporal annotation file of a action. Create list of image paths and list of labels.
     :param root: String. Directory where all images are stored.
     :param annfile: String. Path where temporal annotation locates.
     :param y_range: Tuple. Label range.
-    :return: List, List. List of image paths and list of labels.
+    :param mode: String. Optical flow or RGB mode.
+    :param ordinal: Boolean. Label format using ordinal regression or not. E.g., 3 --> [1, 1, 1, 0, 0, ....]
+    :param stack_length: Int. Number of input images stacked for training unit. Default 1 for RGB,
+    For optical flow, default 10 (finally will get 20 since both u and v).
+    :param multi_action: Boolean. If true, label will be assign a action_index along aside for indicating its action class
+    :param action_index: Int. Only used when multi_action is True, representing the action_index for this action.
+    :param weighted: Boolean. If true, the samples with completeness in two side will be put more weights and this function
+    will also return a sample-wise weights list.
+    :return: List, List. List of image paths and list of labels and list of weights (if weighted=True).
     """
     import pandas as pd
     import numpy as np
     temporal_annotations = pd.read_csv(annfile, header=None)
 
-    if mode == 'rgb':
-        img_paths, labels, weights = [], [], []
-        for i_r, row in temporal_annotations.iterrows():
-            action_length = row.values[2] + 1 - row.values[1]
-            img_paths.extend(["{}/{}/{}.jpg".format(root, row.values[0], str(num).zfill(5)) for num in
-                              np.arange(row.values[1], row.values[2] + 1)])
-            labels.extend(generate_labels(action_length, y_range=y_range, ordinal=ordinal, multi_action=multi_action))
+    stacked_list, labels, weights = [], [], []
+    for video, start, end in temporal_annotations.itertuples(index=False):
+        if mode == 'rgb':
+            v_paths = ["{}/{}/{}.jpg".format(root, video, str(num).zfill(5)) for num in np.arange(start, end + 1)]
+            v_stacked_paths = [v_paths[i:i + stack_length] for i in range(0, len(v_paths) - stack_length + 1)]
+        elif mode == 'flow':
+            v_paths = ["{}/{}/{}/{}_{}.jpg".format(root, video, d, d, str(num + 1).zfill(5)) for num in
+                       np.arange(start, end) for d in ['flow_x', 'flow_y']]
+            v_stacked_paths = [v_paths[2 * i:2 * i + stack_length * 2] for i in
+                               range(0, len(v_paths) // 2 - stack_length + 1)]
+        else:
+            raise ValueError("only support 'rgb' or 'flow' for mode argument")
+        stacked_list.extend(v_stacked_paths)
+
+        v_stacked_length = len(v_stacked_paths)
+        labels.extend(generate_labels(v_stacked_length, y_range, ordinal, multi_action, action_index))
         if weighted:
             w_10 = [3, 2, 1, 1, 1, 1, 1, 1, 2, 3]
-            weights.extend(np.hstack([w*p for w, p in zip(w_10, np.array_split(np.ones(action_length), 10))]))
-            return img_paths, labels, weights
-        else:
-            return img_paths, labels
+            weights.extend(np.hstack([w * p for w, p in zip(w_10, np.array_split(np.ones(v_stacked_length), 10))]))
 
-    elif mode == 'flow':
-        flow_paths, labels = [], []
-        for i_r, row in temporal_annotations.iterrows():
-            flow_paths.append(["{}/{}/{}/{}_{}.jpg".format(root, row.values[0], d, d, str(num + 1).zfill(5)) for num in
-                               np.arange(row.values[1], row.values[2]) for d in ['flow_x', 'flow_y']])
-        stacked_flow_list = []
-        for v_fl in flow_paths:
-            v_stacked_flow = [v_fl[2 * i:2 * i + stack_length * 2] for i in range(0, len(v_fl) // 2 - stack_length + 1)]
-            labels.extend(generate_labels(len(v_stacked_flow), y_range, ordinal, multi_action, action_index))
-            stacked_flow_list.extend(v_stacked_flow)
-        return stacked_flow_list, labels
+    return (stacked_list, labels, weights) if weighted else (stacked_list, labels)
 
 
-def read_from_anndir(root, anndir, y_range, mode='rgb', orinal=False, stack_length=10, multi_action=True):
+def read_from_anndir(root, anndir, **kwargs):
     """
-    According to the temporal annotation file. Create list of image paths and list of labels.
+    Warped function for "read_from_annfile" to read multiple annfiles in an directory for multiple actions.
+    According to the temporal annotation files. Create list of image paths and list of labels.
     :param root: String. Directory where all images are stored.
     :param anndir: String. Path where temporal annotation locates.
-    :param y_range: Tuple. Label range.
     :return: List, List. List of image paths and list of labels.
     """
     from pathlib import Path
@@ -115,8 +119,7 @@ def read_from_anndir(root, anndir, y_range, mode='rgb', orinal=False, stack_leng
     datalist, ylist = [], []
     for annfile in sorted(Path(anndir).iterdir()):
         action_name = str(annfile.stem).split('_')[0]
-        action_list, label_list = read_from_annfile(root, str(annfile), y_range, mode, orinal, stack_length,
-                                                    multi_action, action_idx[action_name])
+        action_list, label_list = read_from_annfile(root, str(annfile), multi_action=True, action_index=action_idx[action_name], **kwargs)
         datalist.extend(action_list)
         ylist.extend(label_list)
     return datalist, ylist
@@ -144,13 +147,18 @@ def decode_img(file_path, label=None, weight=None):
         return img, label, weight
 
 
-def build_dataset_from_slices(data_list, labels_list=None, weighs=None, batch_size=32, augment=None, shuffle=True, prefetch=True):
+def build_dataset_from_slices(data_list, labels_list=None, weighs=None, batch_size=32, augment=None, shuffle=True,
+                              prefetch=True):
     """
     Given image paths and labels, create tf.data.Dataset instance.
     :param data_list: List. Consists of strings. Each string is a path of one image.
-    :param labels_list: List. Consists of labels. None means for only prediction
-    :param transform: List. transform functions applied on images.
-    :return: tf.data.Dataset. if labels_list is provided, will produce a labeled dataset. Images dataset otherwise.
+    :param labels_list: List. Consists of labels. None means for only prediction.
+    :param weighs: List. Consists of sample-wise weigths. None for prediction.
+    :param batch_size: Int.
+    :param augment: Func. Data augment function. input: (stacked_imgs, labels, weights), output (augmented_imgs, labels, weights)
+    :param shuffle: Boolean. True for train, False for prediction and evaluation
+    :param prefetch: Boolean. Refer to prefetch technology in tensorflow.data.Dataset
+    :return: tf.data.Dataset.
     """
     import tensorflow as tf
     AUTOTUNE = tf.data.experimental.AUTOTUNE
@@ -162,27 +170,9 @@ def build_dataset_from_slices(data_list, labels_list=None, weighs=None, batch_si
         dataset = tf.data.Dataset.from_tensor_slices((data_list, labels_list, weighs))
     if shuffle:
         dataset = dataset.shuffle(len(data_list))
-    dataset = dataset.map(decode_img, num_parallel_calls=AUTOTUNE)
-    dataset = dataset.map(format_img, num_parallel_calls=AUTOTUNE)
-    if augment:
-        dataset = dataset.map(augment, num_parallel_calls=AUTOTUNE)
-    dataset = dataset.batch(batch_size)
-    if prefetch:
-        dataset = dataset.prefetch(buffer_size=AUTOTUNE)
-    return dataset
 
-
-def stack_optical_flow(flow_list, labels_list=None, batch_size=32, augment=None, shuffle=True, prefetch=True):
-    import tensorflow as tf
-    AUTOTUNE = tf.data.experimental.AUTOTUNE
-    if labels_list is None:
-        dataset = tf.data.Dataset.from_tensor_slices(flow_list)
-    else:
-        dataset = tf.data.Dataset.from_tensor_slices((flow_list, labels_list))
-    if shuffle:
-        dataset = dataset.shuffle(len(flow_list))
-
-    def stack_decode_format(filepath_list, labels=None):
+    def stack_decode_format(filepath_list, labels=None, weights=None):
+        """Decode stacked image paths to stacked image tensors and format to desired format"""
         filepath_list = tf.unstack(filepath_list, axis=-1)
         flow_snip = []
         for flow_path in filepath_list:
@@ -191,8 +181,10 @@ def stack_optical_flow(flow_list, labels_list=None, batch_size=32, augment=None,
         parsed = tf.concat(flow_snip, axis=-1)
         if labels is None:
             return parsed
-        else:
+        elif weighs is None:
             return parsed, labels
+        else:
+            return parsed, labels, weights
 
     dataset = dataset.map(stack_decode_format, num_parallel_calls=AUTOTUNE)
     if augment:

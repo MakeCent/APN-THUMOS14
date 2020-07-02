@@ -62,9 +62,9 @@ def augment_func(x, y):
     import tensorflow as tf
     x = tf.image.random_flip_left_right(x)
     return x, y
-datalist = {x: read_from_anndir(root[x], anndir[x], y_range, orinal=True) for x in ['train', 'val', 'test']}
+datalist = {x: read_from_anndir(root[x], anndir[x], y_range=y_range, ordinal=True, mode='rgb', stack_length=10) for x in ['train', 'val', 'test']}
 test_dataset = build_dataset_from_slices(*datalist['test'], batch_size=batch_size, shuffle=False)
-train_val_datalist = (datalist['train'][0]+datalist['val'][0], datalist['train'][1]+datalist['val'][1])
+train_val_datalist = [a + b for a, b in zip(datalist['train'], datalist['val'])]
 train_val_dataset = build_dataset_from_slices(*train_val_datalist, batch_size=batch_size, augment=augment_func)
 # %% Build and compile model
 strategy = tf.distribute.MirroredStrategy()
