@@ -26,7 +26,7 @@ flow_model_path = "/mnt/louis-consistent/Saved/THUMOS14_output/GolfSwing/50-22.0
 # flow_img_list = find_flows(flow_video_path)
 # flow_untrimmed_video = stack_optical_flow(flow_img_list, batch_size=1, shuffle=False)
 
-rgb_loss, rgb_metric = 'mse', n_mae
+rgb_loss, rgb_metric = 'binary_crossentropy', mae_od
 flow_loss, flow_metric = 'binary_crossentropy', mae_od
 # %% Also test on trimmed train, validation, and test dataset
 rgb_root = {'train': "/mnt/louis-consistent/Datasets/THUMOS14/Images/train",
@@ -49,7 +49,7 @@ annfile = {
 # video_gt = t.loc[t.iloc[:, 0] == Path(rgb_video_path).stem].iloc[:, 1:].values  # temporal annotations of the untrimmed video
 
 # %% Build datasets
-rgb_datalist = {x: read_from_annfile(rgb_root[x], annfile[x], (1, 100)) for x in ['train', 'val', 'test']}
+rgb_datalist = {x: read_from_annfile(rgb_root[x], annfile[x], (1, 100), ordinal=ordinal) for x in ['train', 'val', 'test']}
 rgb_train_dataset = build_dataset_from_slices(*rgb_datalist['train'], batch_size=1, shuffle=False)
 rgb_val_dataset = build_dataset_from_slices(*rgb_datalist['val'], batch_size=1, shuffle=False)
 rgb_test_dataset = build_dataset_from_slices(*rgb_datalist['test'], batch_size=1, shuffle=False)
@@ -72,24 +72,26 @@ flow_test_records = FLowLossCallback()
 
 # %% Prediction on trimmed videos and single untrimmed video
 with strategy.scope():
-    rgb_model = tf.keras.models.load_model(rgb_model_path, compile=False, custom_objects={'BiasLayer': BiasLayer})
+    rgb_model = tf.keras.models.load_model(rgb_model_path, compile=False, custom_objects={'BiasLayer': MultiAction_BiasLayer})
+    rgb_model = tf.keras.Sequential([rgb_model, tf.keras.layers.Reshape((100,))])
     rgb_model.compile(loss=rgb_loss, metrics=[rgb_metric])
     # rgb_train_prediction = rgb_model.predict(rgb_train_dataset, verbose=1)
     # rgb_val_prediction = rgb_model.predict(rgb_val_dataset, verbose=1)
-    rgb_test_prediction = rgb_model.predict(rgb_test_dataset, verbose=1)
+    # rgb_test_prediction = rgb_model.predict(rgb_test_dataset, verbose=1)
     # rgb_train_evaluation = rgb_model.evaluate(rgb_train_dataset, verbose=1, callbacks=[rgb_train_records])
     # rgb_val_evaluation = rgb_model.evaluate(rgb_val_dataset, verbose=1, callbacks=[rgb_val_records])
-    rgb_test_evaluation = rgb_model.evaluate(rgb_test_dataset, verbose=1, callbacks=[rgb_test_records])
+    # rgb_test_evaluation = rgb_model.evaluate(rgb_test_dataset, verbose=1, callbacks=[rgb_test_records])
     # rgb_video_prediction = rgb_model.predict(rgb_untrimmed_video, verbose=1)
 
-    flow_model = tf.keras.models.load_model(flow_model_path, compile=False, custom_objects={'BiasLayer': BiasLayer})
+    flow_model = tf.keras.models.load_model(flow_model_path, compile=False, custom_objects={'BiasLayer': MultiAction_BiasLayer})
+    flow_model = tf.keras.Sequential([flow_model, tf.keras.layers.Reshape((100,))])
     flow_model.compile(loss=flow_loss, metrics=[flow_metric])
     # flow_train_prediction = flow_model.predict(flow_train_dataset, verbose=1)
     # flow_val_prediction = flow_model.predict(flow_val_dataset, verbose=1)
-    flow_test_prediction = flow_model.predict(flow_test_dataset, verbose=1)
+    # flow_test_prediction = flow_model.predict(flow_test_dataset, verbose=1)
     # flow_train_evaluation = flow_model.evaluate(flow_train_dataset, verbose=1, callbacks=[flow_train_records])
     # flow_val_evaluation = flow_model.evaluate(flow_val_dataset, verbose=1, callbacks=[flow_val_records])
-    flow_test_evaluation = flow_model.evaluate(flow_test_dataset, verbose=1, callbacks=[flow_test_records])
+    # flow_test_evaluation = flow_model.evaluate(flow_test_dataset, verbose=1, callbacks=[flow_test_records])
     # flow_video_prediction = flow_model.predict(flow_untrimmed_video, verbose=1)
 
 # boxplot
@@ -114,13 +116,11 @@ for v in video_names:
 
     rgb_ds = build_dataset_from_slices(img_list, batch_size=1, shuffle=False)
     rgb_untrimmed_prediction = rgb_model.predict(rgb_ds, verbose=1)
-    rgb_untrimmed_prediction = np.squeeze(rgb_untrimmed_prediction)
-    rgb_untrimmed_predictions[v] = rgb_untrimmed_prediction
+    rgb_untrimmed_predictions[v] = np.squeeze(rgb_untrimmed_prediction)
 
     flow_ds = stack_optical_flow(flow_list, batch_size=1, shuffle=False)
     flow_untrimmed_prediction = flow_model.predict(flow_ds, verbose=1)
-    flow_untrimmed_prediction = ordinal2completeness(flow_untrimmed_prediction)
-    flow_untrimmed_predictions[v] = flow_untrimmed_prediction
+    flow_untrimmed_predictions[v] = np.squeeze(flow_untrimmed_prediction)
 
     num_predict = flow_untrimmed_prediction.shape[0]
     fused_untrimmed_predictions[v] = (flow_untrimmed_prediction + rgb_untrimmed_prediction[:num_predict]) / 2
@@ -129,11 +129,13 @@ for v in video_names:
 import numpy as np
 num_gt = sum([len(gt) for gt in ground_truth.values()])
 
-iou = 0.3
+iou = 0.5
 
 rgb_action_detected = {}
 rgb_tps = {}
 for v, prediction in rgb_untrimmed_predictions.items():
+    if ordinal:
+        prediction = ordinal2completeness(prediction)
     ads = action_search(prediction, min_T=50, max_T=30, min_L=40)
     rgb_action_detected[v] = ads
     rgb_tps[v] = calc_truepositive(ads, ground_truth[v], iou)
@@ -147,6 +149,8 @@ plot_detection(prediction, gt, ads)
 flow_action_detected = {}
 flow_tps = {}
 for v, prediction in flow_untrimmed_predictions.items():
+    if ordinal:
+        prediction = ordinal2completeness(prediction)
     ads = action_search(prediction, min_T=80, max_T=30, min_L=100)
     flow_action_detected[v] = ads
     flow_tps[v] = calc_truepositive(ads, ground_truth[v], iou)
@@ -160,6 +164,8 @@ plot_detection(prediction, gt, ads)
 fused_action_detected = {}
 fused_tps = {}
 for v, prediction in fused_untrimmed_predictions.items():
+    if ordinal:
+        prediction = ordinal2completeness(prediction)
     ads = action_search(prediction, min_T=50, max_T=30, min_L=40)
     fused_action_detected[v] = ads
     fused_tps[v] = calc_truepositive(ads, ground_truth[v], iou)
@@ -168,10 +174,26 @@ fused_loss = np.vstack(list(fused_action_detected.values()))[:, 2]
 fused_tp_values = np.hstack(list(fused_tps.values()))
 fused_ap = average_precision(fused_tp_values, num_gt, fused_loss)
 
-plot_prediction(prediction)
-plot_detection(prediction, gt, ads)
+# plot_prediction(prediction)
+# plot_detection(prediction, gt, ads)
 # Fused by deleted detections not intersect with each other
+fused2_action_detected = {}
+fused2_tps = {}
+for v, rgb_ad in rgb_action_detected.items():
+    op_ad = flow_action_detected[v]
+    iou_matrix = matrix_iou(rgb_ad[:, :2], op_ad[:, :2])
+    ads = []
+    while iou_matrix.max() > 0:
+        max_idx = np.unravel_index(iou_matrix.argmax(), iou_matrix.shape)
+        ads.append(rgb_ad[max_idx[0]] if rgb_ad[max_idx[0]][2] < op_ad[max_idx[1]][2] else op_ad[max_idx[1]])
+        iou_matrix[max_idx[0], :],  iou_matrix[:, max_idx[1]] = 0, 0
+    ads = np.vstack(ads)
+    fused2_action_detected[v] = ads
+    fused2_tps[v] = calc_truepositive(ads, ground_truth[v], iou)
 
+fused2_loss = np.vstack(list(fused2_action_detected.values()))[:, 2]
+fused2_tp_values = np.hstack(list(fused2_tps.values()))
+fused2_ap = average_precision(fused2_tp_values, num_gt, fused2_loss)
 # %% Single untrimmed video detection
 # rgb_ads = action_search(rgb_video_prediction, min_T=50, max_T=30, min_L=35)
 # rgb_ads = np.array(rgb_ads)

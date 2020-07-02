@@ -38,8 +38,7 @@ for v in video_names:
     ds = build_dataset_from_slices(img_list, batch_size=1, shuffle=False)
 
     prediction = model.predict(ds, verbose=1)
-
-    predictions[v] = prediction
+    predictions[v] = np.squeeze(prediction)
 
 # %% Detect actions
 action_detected = {}
@@ -59,4 +58,4 @@ tp_values = np.hstack(list(tps.values()))
 ap = average_precision(tp_values, num_gt, loss)
 
 plot_prediction(prediction)
-plot_detection(prediction, gt, np.vstack(list(action_detected.values())))
+plot_detection(prediction, gt, ads)

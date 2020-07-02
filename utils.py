@@ -226,17 +226,17 @@ def plot_prediction(video_prediction):
     plt.show()
 
 
+def iou(a, b):
+    ov = 0
+    union = max(a[1], b[1]) - min(a[0], b[0])
+    intersection = min(a[1], b[1]) - max(a[0], a[0])
+    if intersection > 0:
+        ov = intersection / union
+    return ov
+
+
 def matrix_iou(gt, ads):
     import numpy as np
-
-    def iou(a, b):
-        ov = 0
-        union = max(a[1], b[1]) - min(a[0], b[0])
-        intersection = min(a[1], b[1]) - max(a[0], a[0])
-        if intersection > 0:
-            ov = intersection / union
-        return ov
-
     ov_m = np.zeros([gt.shape[0], ads.shape[0]])
     for i in range(gt.shape[0]):
         for j in range(ads.shape[0]):
@@ -259,12 +259,13 @@ def calc_truepositive(action_detected, temporal_annotations, iou_T):
         return np.array([], dtype=np.int)
     iou_matrix = matrix_iou(temporal_annotations, action_detected[:, :2])
     tp = np.zeros(num_detection, dtype=np.int)
-    for r in range(iou_matrix.shape[0]):
-        max_iou = iou_matrix[r, :].max()
-        max_idx = iou_matrix[r, :].argmax()
-        if max_iou > iou_T:
-            iou_matrix[:, max_idx] = 0
-            tp[max_idx] = 1
+    while True:
+        max_idx = np.unravel_index(iou_matrix.argmax(), iou_matrix.shape)
+        if iou_matrix[max_idx] > iou_T:
+            tp[max_idx[1]] = 1
+        else:
+            break
+        iou_matrix[max_idx[0], :],  iou_matrix[:, max_idx[1]] = 0, 0
     return tp
 
 
@@ -374,28 +375,6 @@ def action_search(completeness_array, min_T, max_T, min_L):
                     action_detected.append(action_candidate)
     action_detected.sort(key=lambda x: x[2])
     return np.array(action_detected).reshape(-1, 3)
-
-
-def replace_intermediate_layer_in_keras(model, layer_id, new_layer, new_training=None, other_training=None):
-    from tensorflow.keras.models import Model
-
-    layers = [l for l in model.layers]
-
-    x = layers[0].output
-    for i in range(1, len(layers)):
-        if i == layer_id:
-            if new_training is not None:
-                x = new_layer(x, training=new_training)
-            else:
-                x = new_layer(x)
-        else:
-            if other_training is not None:
-                x = layers[i](x, training=other_training)
-            else:
-                x = layers[i](x)
-
-    new_model = Model(input=layers[0].input, output=x)
-    return new_model
 
 
 def insert_layer_nonseq(model, layer_regex, insert_layer_factory, insert_layer_name=None, position='after',
