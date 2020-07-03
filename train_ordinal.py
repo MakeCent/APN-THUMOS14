@@ -88,13 +88,12 @@ with strategy.scope():
     output = Activation('sigmoid')(x)
     model = Model(inputs, output)
     model_checkpoint = ModelCheckpoint(str(models_path.joinpath('{epoch:02d}-{val_mae_od:.2f}.h5')), period=5)
-    lr_sche = LearningRateScheduler(lr_schedule)
     # %% Fine tune
     backbone.trainable = True
     model.compile(loss=loss, optimizer=tf.keras.optimizers.Adam(learning_rate), metrics=[mae_od])
 
 ftune_his = model.fit(train_val_dataset, validation_data=test_dataset, epochs=epochs,
-                          callbacks=[model_checkpoint, wandbcb, lr_sche], verbose=1)
+                          callbacks=[model_checkpoint, wandbcb], verbose=1)
 
 # %% Save history to csv and images
 history = ftune_his.history
