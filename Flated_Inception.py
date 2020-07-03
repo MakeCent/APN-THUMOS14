@@ -1,7 +1,7 @@
 """Inception-v1 Inflated 3D ConvNet used for Kinetics CVPR paper.
- 
+
 The model is introduced in:
- 
+
 Quo Vadis, Action Recognition? A New Model and the Kinetics Dataset
 Joao Carreira, Andrew Zisserman
 https://arxiv.org/abs/1705.07750v1
@@ -186,7 +186,7 @@ def conv3d_bn(x,
         num_col: width of the convolution kernel.
         padding: padding mode in `Conv3D`.
         strides: strides in `Conv3D`.
-        use_bias: use bias or not  
+        use_bias: use bias or not
         use_activation_fn: use an activation function or not.
         use_bn: use batch normalization or not.
         name: name of the ops; will become `name + '_conv'`
@@ -241,7 +241,7 @@ def Inception_Inflated3d(include_top=True,
     specified in your tensorflow.keras config file.
     Note that the default input frame(image) size for this model is 224x224.
     # Arguments
-        include_top: whether to include the the classification 
+        include_top: whether to include the the classification
             layer at the top of the network.
         weights: one of `None` (random initialization)
             or 'kinetics_only' (pre-training on Kinetics dataset only).
@@ -258,13 +258,13 @@ def Inception_Inflated3d(include_top=True,
             Also, Width and height should be no smaller than 32.
             E.g. `(64, 150, 150, 3)` would be one valid value.
         dropout_prob: optional, dropout probability applied in dropout layer
-            after global average pooling layer. 
+            after global average pooling layer.
             0.0 means no dropout is applied, 1.0 means dropout is applied to all features.
             Note: Since Dropout is applied just before the classification
             layer, it is only useful when `include_top` is set to True.
         endpoint_logit: (boolean) optional. If True, the model's forward pass
             will end at producing logits. Otherwise, softmax is applied after producing
-            the logits to produce the class probabilities prediction. Setting this parameter 
+            the logits to produce the class probabilities prediction. Setting this parameter
             to True is particularly useful when you want to combine results of rgb model
             and optical flow model.
             - `True` end model forward pass at logit output

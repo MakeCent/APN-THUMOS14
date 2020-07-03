@@ -68,9 +68,9 @@ models_path.mkdir(parents=True, exist_ok=True)
 #     x = tf.image.random_flip_left_right(x)
 #     return x, y
 
-datalist = {x: read_from_annfile(root[x], annfile[x], y_range) for x in ['train', 'val', 'test']}
+datalist = {x: read_from_annfile(root[x], annfile[x], y_range=y_range, mode='rgb', ordinal=False, weighted=False, stack_length=10) for x in ['train', 'val', 'test']}
 test_dataset = build_dataset_from_slices(*datalist['test'], batch_size=batch_size, shuffle=False)
-train_val_datalist = (datalist['train'][0]+datalist['val'][0], datalist['train'][1]+datalist['val'][1])
+train_val_datalist = [a+b for a, b in zip(datalist['train'], datalist['val'])]
 train_val_dataset = build_dataset_from_slices(*train_val_datalist, batch_size=batch_size, augment=None)
 
 # %% Build and compile model
@@ -84,7 +84,7 @@ with strategy.scope():
     x = Dropout(0.5)(x)
     x = Dense(2048, activation='relu', kernel_initializer='he_uniform')(x)
     x = Dropout(0.5)(x)
-    output = Dense(1, kernel_initializer='he_uniform')(x)
+    output = Dense(1, activation='relu', kernel_initializer='he_uniform')(x)
     model = Model(inputs, output)
     model_checkpoint = ModelCheckpoint(str(models_path.joinpath('{epoch:02d}-{val_n_mae:.2f}.h5')), period=5)
     lr_sche = LearningRateScheduler(lr_schedule)

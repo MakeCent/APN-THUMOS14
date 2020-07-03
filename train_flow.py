@@ -66,7 +66,7 @@ models_path.mkdir(parents=True, exist_ok=True)
 
 datalist = {x: read_from_annfile(root[x], annfile[x], y_range, mode='flow') for x in ['train', 'val', 'test']}
 test_dataset = stack_optical_flow(*datalist['test'], batch_size=batch_size, shuffle=False)
-train_val_datalist = (datalist['train'][0]+datalist['val'][0], datalist['train'][1]+datalist['val'][1])
+train_val_datalist = [a+b for a, b in zip(datalist['train'], datalist['val'])]
 train_val_dataset = stack_optical_flow(*train_val_datalist, batch_size=batch_size)
 # %% Build and compile model
 n_mae = normalize_mae(y_range[1] - y_range[0])  # make mae loss normalized into range 0 - 100.
@@ -95,7 +95,7 @@ with strategy.scope():
     x = Dropout(0.9)(x)
     x = Dense(2048, activation='relu', kernel_initializer='he_uniform')(x)
     x = Dropout(0.9)(x)
-    output = Dense(1, kernel_initializer='he_uniform')(x)
+    output = Dense(1, activation='relu', kernel_initializer='he_uniform')(x)
     model = Model(inputs, output)
     model_checkpoint = ModelCheckpoint(str(models_path.joinpath('{epoch:02d}-{val_n_mae:.2f}.h5')), period=5)
     lr_sche = LearningRateScheduler(lr_schedule)
