@@ -189,7 +189,8 @@ def build_dataset_from_slices(data_list, labels_list=None, weighs=None, batch_si
     dataset = dataset.map(stack_decode_format, num_parallel_calls=AUTOTUNE)
     if augment:
         dataset = dataset.map(augment, num_parallel_calls=AUTOTUNE)
-    dataset = dataset.batch(batch_size)
+    if batch_size>0:
+        dataset = dataset.batch(batch_size)
     if prefetch:
         dataset = dataset.prefetch(buffer_size=AUTOTUNE)
     return dataset

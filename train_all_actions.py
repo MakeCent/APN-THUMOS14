@@ -9,7 +9,7 @@ from utils import *
 from custom_class import MultiAction_BiasLayer
 from pathlib import Path
 from tensorflow.keras.applications import ResNet101
-from tensorflow.keras.layers import Dense, Dropout, Activation
+from tensorflow.keras.layers import Dense, Dropout, Activation, Reshape
 from tensorflow.keras import Model
 from tensorflow.keras.callbacks import ModelCheckpoint, LearningRateScheduler
 import wandb
@@ -22,6 +22,7 @@ AUTOTUNE = tf.data.experimental.AUTOTUNE
 fix_bug()
 now = datetime.datetime.now().strftime("%Y-%m-%d-%H:%M:%S")
 # %% wandb Initialization
+# Configurations. If you don't use wandb, just manually set these values.
 default_config = dict(
     y_s=1,
     y_e=100,
@@ -30,7 +31,20 @@ default_config = dict(
     epochs=100,
     agent=agent
 )
-wandb.init(config=default_config, name=now, notes='one model for all action, multi-task train')
+ordinal = True
+mode = 'rgb'
+stack_length = 1
+weighted = False
+
+# Just for wandb
+tags = ['all', mode]
+if ordinal:
+    tags.append("od")
+if weighted:
+    tags.append("weighted")
+if stack_length > 1:
+    tags.append("stack{}".format(stack_length))
+wandb.init(config=default_config, name=now, tags=tags, notes='+stackRGB')
 config = wandb.config
 wandbcb = WandbCallback(monitor='val_n_mae', save_model=False)
 
@@ -58,29 +72,33 @@ history_path.mkdir(parents=True, exist_ok=True)
 models_path.mkdir(parents=True, exist_ok=True)
 
 # %% Build dataset
-def augment_func(x, y):
-    import tensorflow as tf
-    x = tf.image.random_flip_left_right(x)
-    return x, y
-datalist = {x: read_from_anndir(root[x], anndir[x], y_range=y_range, ordinal=True, mode='rgb', stack_length=10) for x in ['train', 'val', 'test']}
+
+
+# def augment_func(x, y=None, w=None):
+#     import tensorflow as tf
+#     x = tf.image.random_flip_left_right(x)
+#     return x, y, w
+
+
+datalist = {x: read_from_anndir(root[x], anndir[x], mode=mode, y_range=y_range, ordinal=ordinal, stack_length=stack_length) for x in ['train', 'val', 'test']}
 test_dataset = build_dataset_from_slices(*datalist['test'], batch_size=batch_size, shuffle=False)
-train_val_datalist = [a + b for a, b in zip(datalist['train'], datalist['val'])]
-train_val_dataset = build_dataset_from_slices(*train_val_datalist, batch_size=batch_size, augment=augment_func)
+train_val_datalist = (datalist['train'][0]+datalist['val'][0], datalist['train'][1]+datalist['val'][1])
+train_val_dataset = build_dataset_from_slices(*train_val_datalist, batch_size=batch_size)
 # %% Build and compile model
 strategy = tf.distribute.MirroredStrategy()
 with strategy.scope():
     inputs = tf.keras.Input(shape=(224, 224, 3))
-    backbone = ResNet101(weights='imagenet', input_shape=(224, 224, 3), pooling='avg', include_top=False)
+    backbone = ResNet101(weights=None, input_shape=(224, 224, 3), pooling='avg', include_top=False)
     x = backbone(inputs)
-    x = Dense(1024, activation='relu', kernel_initializer='he_uniform')(x)
-    x = Dropout(0.5)(x)
-    x = Dense(1024, activation='relu', kernel_initializer='he_uniform')(x)
-    x = Dropout(0.5)(x)
+    x = Dense(2048, activation='relu', kernel_initializer='he_uniform')(x)
+    x = Dropout(0.9)(x)
+    x = Dense(2048, activation='relu', kernel_initializer='he_uniform')(x)
+    x = Dropout(0.9)(x)
     x = Dense(action_num, kernel_initializer='he_uniform', use_bias=False)(x)
     x = MultiAction_BiasLayer(y_nums)(x)
     output = Activation('sigmoid')(x)
     model = Model(inputs, output)
-    model_checkpoint = ModelCheckpoint(str(models_path.joinpath('{epoch:02d}-{val_mae_od:.2f}.h5')), period=5)
+    model_checkpoint = ModelCheckpoint(str(models_path.joinpath('{epoch:02d}-{val_multi_od_metric:.2f}.h5')), period=5)
     lr_sche = LearningRateScheduler(lr_schedule)
     # %% Fine tune
     backbone.trainable = True
