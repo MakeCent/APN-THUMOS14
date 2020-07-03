@@ -222,28 +222,3 @@ def find_flows(video_path, suffix='jpg', stack_length=10):
     v_fl = [str(e) for xy in zip(flow_x, flow_y) for e in xy]
     v_stacked_flow = [v_fl[2 * i:2 * i + stack_length * 2] for i in range(0, len(v_fl) // 2 - stack_length + 1)]
     return v_stacked_flow
-
-
-def prepare_for_training(ds, batch_size, cache=True, shuffle_buffer_size=1000):
-    """
-    Given a tf.data.Dataset that contain all data but has not been prepared for training. This do preparation for it.
-    :param ds: tf.data.Dataset. Contain all data and labels.
-    :param batch_size: Int.
-    :param cache: Boolean.
-    :param shuffle_buffer_size: Int.
-    :return: tf.data.Dataset. A dataset prepared for training. batched, shuffled, prefetch and cached(may)
-    """
-    import tensorflow as tf
-    AUTOTUNE = tf.data.experimental.AUTOTUNE
-    if cache:
-        if isinstance(cache, str):
-            ds = ds.cache(cache)
-        else:
-            ds = ds.cache()
-
-    ds = ds.shuffle(buffer_size=shuffle_buffer_size)
-    ds = ds.repeat()
-    ds = ds.batch(batch_size)
-    ds = ds.prefetch(buffer_size=AUTOTUNE)
-
-    return ds

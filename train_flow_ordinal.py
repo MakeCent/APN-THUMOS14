@@ -33,7 +33,7 @@ default_config = dict(
     action="GolfSwing",
     agent=agent
 )
-wandb.init(config=default_config, name=now, notes='opf, od, 256^2, dp0.5')
+wandb.init(config=default_config, name=now, notes='opf, od, 2048^2, dp0.5')
 config = wandb.config
 wandbcb = WandbCallback(monitor='val_n_mae', save_model=False)
 
@@ -65,10 +65,10 @@ models_path.mkdir(parents=True, exist_ok=True)
 
 # %% Build dataset
 
-datalist = {x: read_from_annfile(root[x], annfile[x], y_range, mode='flow') for x in ['train', 'val', 'test']}
-test_dataset = stack_optical_flow(*datalist['test'], batch_size=batch_size, shuffle=False)
+datalist = {x: read_from_annfile(root[x], annfile[x], y_range, ordinal=True, mode='flow', stack_length=10) for x in ['train', 'val', 'test']}
+test_dataset = build_dataset_from_slices(*datalist['test'], batch_size=batch_size, shuffle=False)
 train_val_datalist = (datalist['train'][0]+datalist['val'][0], datalist['train'][1]+datalist['val'][1])
-train_val_dataset = stack_optical_flow(*train_val_datalist, batch_size=batch_size)
+train_val_dataset = build_dataset_from_slices(*train_val_datalist, batch_size=batch_size)
 # %% Build and compile model
 strategy = tf.distribute.MirroredStrategy()
 
@@ -85,16 +85,18 @@ def bn_factory():
 with strategy.scope():
     inputs = tf.keras.Input(shape=(224, 224, 20))
     backbone = ResNet101(weights=None, input_shape=(224, 224, 20), pooling='avg', include_top=False)
+    # Partial BN
     backbone = insert_layer_nonseq(backbone, 'conv1_bn', bn_factory, position='replace', new_training=True, other_training=False)
+    # Cross Modality Pre-train
     backbone.layers[2].set_weights([extended_kernels, biases])
     for layer in pretrained.layers:
         if layer.name != 'conv1_conv' and layer.get_weights() != []:
             backbone.get_layer(layer.name).set_weights(layer.get_weights())
     x = backbone(inputs)
-    x = Dense(256, activation='relu', kernel_initializer='he_uniform')(x)
-    x = Dropout(0.5)(x)
-    x = Dense(256, activation='relu', kernel_initializer='he_uniform')(x)
-    x = Dropout(0.5)(x)
+    x = Dense(2048, activation='relu', kernel_initializer='he_uniform')(x)
+    x = Dropout(0.9)(x)
+    x = Dense(2048, activation='relu', kernel_initializer='he_uniform')(x)
+    x = Dropout(0.9)(x)
     x = Dense(1, kernel_initializer='he_uniform', use_bias=False)(x)
     x = BiasLayer(y_nums)(x)
     output = Activation('sigmoid')(x)
@@ -125,7 +127,7 @@ for v in video_names:
 
     video_path = Path(root['test'], v)
     flow_list = find_flows(video_path)
-    ds = stack_optical_flow(flow_list, batch_size=1, shuffle=False)
+    ds = build_dataset_from_slices(flow_list, batch_size=1, shuffle=False)
     prediction = model.predict(ds, verbose=1)
     predictions[v] = np.squeeze(prediction)
 

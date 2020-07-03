@@ -54,10 +54,10 @@ rgb_train_dataset = build_dataset_from_slices(*rgb_datalist['train'], batch_size
 rgb_val_dataset = build_dataset_from_slices(*rgb_datalist['val'], batch_size=1, shuffle=False)
 rgb_test_dataset = build_dataset_from_slices(*rgb_datalist['test'], batch_size=1, shuffle=False)
 
-flow_datalist = {x: read_from_annfile(flow_root[x], annfile[x], (1, 100), mode='flow', ordinal=ordinal) for x in ['train', 'val', 'test']}
-flow_train_dataset = stack_optical_flow(*flow_datalist['train'], batch_size=1, shuffle=False)
-flow_val_dataset = stack_optical_flow(*flow_datalist['val'], batch_size=1, shuffle=False)
-flow_test_dataset = stack_optical_flow(*flow_datalist['test'], batch_size=1, shuffle=False)
+flow_datalist = {x: read_from_annfile(flow_root[x], annfile[x], (1, 100), mode='flow', ordinal=ordinal, stack_length=10) for x in ['train', 'val', 'test']}
+flow_train_dataset = build_dataset_from_slices(*flow_datalist['train'], batch_size=1, shuffle=False)
+flow_val_dataset = build_dataset_from_slices(*flow_datalist['val'], batch_size=1, shuffle=False)
+flow_test_dataset = build_dataset_from_slices(*flow_datalist['test'], batch_size=1, shuffle=False)
 
 
 strategy = tf.distribute.MirroredStrategy()
@@ -118,7 +118,7 @@ for v in video_names:
     rgb_untrimmed_prediction = rgb_model.predict(rgb_ds, verbose=1)
     rgb_untrimmed_predictions[v] = np.squeeze(rgb_untrimmed_prediction)
 
-    flow_ds = stack_optical_flow(flow_list, batch_size=1, shuffle=False)
+    flow_ds = build_dataset_from_slices(flow_list, batch_size=1, shuffle=False)
     flow_untrimmed_prediction = flow_model.predict(flow_ds, verbose=1)
     flow_untrimmed_predictions[v] = np.squeeze(flow_untrimmed_prediction)
 
@@ -151,7 +151,7 @@ flow_tps = {}
 for v, prediction in flow_untrimmed_predictions.items():
     if ordinal:
         prediction = ordinal2completeness(prediction)
-    ads = action_search(prediction, min_T=80, max_T=30, min_L=100)
+    ads = action_search(prediction, min_T=80, max_T=30, min_L=60)
     flow_action_detected[v] = ads
     flow_tps[v] = calc_truepositive(ads, ground_truth[v], iou)
 
@@ -166,7 +166,7 @@ fused_tps = {}
 for v, prediction in fused_untrimmed_predictions.items():
     if ordinal:
         prediction = ordinal2completeness(prediction)
-    ads = action_search(prediction, min_T=50, max_T=30, min_L=40)
+    ads = action_search(prediction, min_T=60, max_T=30, min_L=40)
     fused_action_detected[v] = ads
     fused_tps[v] = calc_truepositive(ads, ground_truth[v], iou)
 
@@ -183,7 +183,7 @@ for v, rgb_ad in rgb_action_detected.items():
     op_ad = flow_action_detected[v]
     iou_matrix = matrix_iou(rgb_ad[:, :2], op_ad[:, :2])
     ads = []
-    while iou_matrix.max() > 0:
+    while iou_matrix.max() > 0.5:
         max_idx = np.unravel_index(iou_matrix.argmax(), iou_matrix.shape)
         ads.append(rgb_ad[max_idx[0]] if rgb_ad[max_idx[0]][2] < op_ad[max_idx[1]][2] else op_ad[max_idx[1]])
         iou_matrix[max_idx[0], :],  iou_matrix[:, max_idx[1]] = 0, 0
