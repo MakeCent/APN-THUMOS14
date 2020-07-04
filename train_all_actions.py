@@ -27,8 +27,8 @@ default_config = dict(
     y_s=1,
     y_e=100,
     learning_rate=0.0001,
-    batch_size=64,
-    epochs=100,
+    batch_size=32,
+    epochs=30,
     agent=agent
 )
 ordinal = True
@@ -44,7 +44,7 @@ if weighted:
     tags.append("weighted")
 if stack_length > 1:
     tags.append("stack{}".format(stack_length))
-wandb.init(config=default_config, name=now, tags=tags, notes='+stackRGB')
+wandb.init(config=default_config, name=now, tags=tags, notes='baseline, all, od, rgb1')
 config = wandb.config
 wandbcb = WandbCallback(monitor='val_n_mae', save_model=False)
 
@@ -88,12 +88,12 @@ train_val_dataset = build_dataset_from_slices(*train_val_datalist, batch_size=ba
 strategy = tf.distribute.MirroredStrategy()
 with strategy.scope():
     inputs = tf.keras.Input(shape=(224, 224, 3))
-    backbone = ResNet101(weights=None, input_shape=(224, 224, 3), pooling='avg', include_top=False)
+    backbone = ResNet101(weights='imagenet', input_shape=(224, 224, 3), pooling='avg', include_top=False)
     x = backbone(inputs)
-    x = Dense(2048, activation='relu', kernel_initializer='he_uniform')(x)
-    x = Dropout(0.9)(x)
-    x = Dense(2048, activation='relu', kernel_initializer='he_uniform')(x)
-    x = Dropout(0.9)(x)
+    x = Dense(1024, activation='relu', kernel_initializer='he_uniform')(x)
+    x = Dropout(0.5)(x)
+    x = Dense(1024, activation='relu', kernel_initializer='he_uniform')(x)
+    x = Dropout(0.5)(x)
     x = Dense(action_num, kernel_initializer='he_uniform', use_bias=False)(x)
     x = MultiAction_BiasLayer(y_nums)(x)
     output = Activation('sigmoid')(x)
@@ -111,33 +111,74 @@ history = ftune_his.history
 save_history(history_path, history)
 plot_history(history_path, history)
 
-# # %% Prediction on untrimmed videos
-# import pandas as pd
-# temporal_annotation = pd.read_csv(annfile['test'], header=None)
-# video_names = temporal_annotation.iloc[:, 0].unique()
-# predictions = {}
-# ground_truth = {}
-# for v in video_names:
-#     gt = temporal_annotation.loc[temporal_annotation.iloc[:, 0] == v].iloc[:, 1:].values
-#     ground_truth[v] = gt
-#
-#     video_path = Path(root['test'], v)
-#     img_list = find_imgs(video_path)
-#     ds = build_dataset_from_slices(img_list, batch_size=1, shuffle=False)
-#     prediction = model.predict(ds, verbose=1)
-#     predictions[v] = prediction
-#
-# # %% Detect actions
-# import numpy as np
-# from action_detection import action_search
-# action_detected = {}
-# tps = {}
-# for v, prediction in predictions.items():
-#     ads = action_search(prediction, min_T=65, max_T=30, min_L=35)
-#     action_detected[v] = ads
-#     tps[v] = calc_truepositive(ads, ground_truth[v], 0.5)
-#
-# num_gt = sum([len(gt) for gt in ground_truth.values()])
-# loss = np.vstack(list(action_detected.values()))[:, 2]
-# tp_values = np.hstack(list(tps.values()))
-# ap = average_precision(tp_values, num_gt, loss)
+# %% Prediction on Untrimmed Videos
+import pandas as pd
+import numpy as np
+video_names = pd.read_csv("/mnt/louis-consistent/Datasets/THUMOS14/Information/test_videos.txt", header=None)
+untrimmed_predictions = {}
+ground_truth = {}
+for v in video_names:
+    gt = pd.read_csv("/mnt/louis-consistent/Datasets/THUMOS14/Information/video_wise_annotationF/test/{}_annotationF".format(v), header=None)
+    ground_truth[v] = gt
+
+    video_path = Path(root['test'], v)
+    img_list = find_imgs(video_path)
+
+    ds = build_dataset_from_slices(img_list, batch_size=1, shuffle=False)
+    untrimmed_prediction = model.predict(ds, verbose=1)
+    untrimmed_predictions[v] = np.squeeze(untrimmed_prediction)
+
+# %% Detect action and calculate mAP
+action_idx = {'BaseballPitch': 0, 'BasketballDunk': 1, 'Billiards': 2, 'CleanAndJerk': 3, 'CliffDiving': 4,
+              'CricketBowling': 5, 'CricketShot': 6, 'Diving': 7, 'FrisbeeCatch': 8, 'GolfSwing': 9,
+              'HammerThrow': 10, 'HighJump': 11, 'JavelinThrow': 12, 'LongJump': 13, 'PoleVault': 14, 'Shotput': 15,
+              'SoccerPenalty': 16, 'TennisSwing': 17, 'ThrowDiscus': 18, 'VolleyballSpiking': 19}
+
+iou = 0.5
+all_detected_action = {}
+KILL = True
+for v, p in untrimmed_predictions:
+    if ordinal:
+        p = ordinal2completeness(p)
+    v_ads = []
+    for ac_name, ac_idx in action_idx.items():
+        ac_prediction = p[:, ac_idx]
+        ac_ads = action_search(ac_prediction, min_T=50, max_T=30, min_L=40)
+        ac_ads = np.c_[ac_ads, np.ones(ac_ads.shape[0]*ac_idx)]
+        v_ads.append(v_ads)
+    v_ads = np.vstack(v_ads)
+    if KILL:
+        iou_matrix = matrix_iou(v_ads[:, :2], v_ads[:, :2])
+        while iou_matrix.max() > 0:
+            max_idx = np.unravel_index(iou_matrix.argmax(), iou_matrix.shape)
+            iou_matrix= np.delete(iou_matrix, max_idx[0], axis=0) if v_ads[max_idx[0]][2] > v_ads[max_idx[1]][2] else np.delete(iou_matrix, max_idx[1], axis=1)
+            v_ads = np.delete(v_ads, max_idx[0], axis=0) if v_ads[max_idx[0]][2] > v_ads[max_idx[1]][2] else np.delete(v_ads, max_idx[1], axis=0)
+        all_detected_action[v] = v_ads
+    else:
+        pass
+    all_detected_action[v] = v_ads
+
+all_detection = np.vstack(list(all_detected_action.values()))
+
+all_tps = {}
+ap = {}
+for ac_gt in Path(anndir['test']).iterdir():
+    ac_name = ac_gt.stem.split('_')[0]
+    ac_idx = action_idx[ac_name]
+    ac_ta = pd.read_csv(str(ac_gt), header=None).values
+    ac_num_gt = ac_ta.shape[0]
+    ac_v = ac_ta[:, 0].squeeze().tolist()
+    ac_tps = {}
+    ac_detected = {}
+    for v in ac_v:
+        ac_v_gt = ac_ta[ac_ta[:, 0] == v][:, 1:3]
+        v_detected = all_detected_action[v]
+        ac_v_detected = v_detected[v_detected[:, 3] == ac_idx]
+        ac_v_tps = calc_truepositive(ac_v_detected, ac_v_gt, iou)
+        ac_tps[v] = ac_v_tps
+    ac_loss = np.vstack(list(ac_detected.values()))[:, 2]
+    ac_tp_values = np.hstack(list(ac_tps.values()))
+    ac_ap = average_precision(ac_tp_values, ac_num_gt, ac_loss)
+    ap[ac_name] = ac_ap
+
+
