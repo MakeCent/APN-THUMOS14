@@ -33,7 +33,7 @@ default_config = dict(
     action="GolfSwing",
     agent=agent
 )
-wandb.init(config=default_config, name=now, notes='opf, od, 2048^2, dp0.5')
+wandb.init(config=default_config, name=now, notes='opf, od, 2048^2, dp0.9')
 config = wandb.config
 wandbcb = WandbCallback(monitor='val_n_mae', save_model=False)
 
@@ -93,10 +93,8 @@ with strategy.scope():
         if layer.name != 'conv1_conv' and layer.get_weights() != []:
             backbone.get_layer(layer.name).set_weights(layer.get_weights())
     x = backbone(inputs)
-    x = Dense(2048, activation='relu', kernel_initializer='he_uniform')(x)
-    x = Dropout(0.9)(x)
-    x = Dense(2048, activation='relu', kernel_initializer='he_uniform')(x)
-    x = Dropout(0.9)(x)
+    x = Dense(1024, activation='relu', kernel_initializer='he_uniform')(x)
+    x = Dropout(0.5)(x)
     x = Dense(1, kernel_initializer='he_uniform', use_bias=False)(x)
     x = BiasLayer(y_nums)(x)
     output = Activation('sigmoid')(x)

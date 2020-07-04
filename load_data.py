@@ -148,7 +148,7 @@ def decode_img(file_path, label=None, weight=None):
 
 
 def build_dataset_from_slices(data_list, labels_list=None, weighs=None, batch_size=32, augment=None, shuffle=True,
-                              prefetch=True):
+                              prefetch=True, i3d=False):
     """
     Given image paths and labels, create tf.data.Dataset instance.
     :param data_list: List. Consists of strings. Each string is a path of one image.
@@ -171,6 +171,21 @@ def build_dataset_from_slices(data_list, labels_list=None, weighs=None, batch_si
     if shuffle:
         dataset = dataset.shuffle(len(data_list))
 
+    def i3d_stack_decode_format(filepath_list, labels=None, weights=None):
+        """Decode stacked image paths to stacked image tensors and format to desired format"""
+        filepath_list = tf.unstack(filepath_list, axis=-1)
+        flow_snip = []
+        for flow_path in filepath_list:
+            decoded = decode_img(flow_path)
+            flow_snip.append(format_img(decoded))
+        parsed = tf.stack(flow_snip, axis=0)
+        if labels is None:
+            return parsed
+        elif weighs is None:
+            return parsed, labels
+        else:
+            return parsed, labels, weights
+
     def stack_decode_format(filepath_list, labels=None, weights=None):
         """Decode stacked image paths to stacked image tensors and format to desired format"""
         filepath_list = tf.unstack(filepath_list, axis=-1)
@@ -185,8 +200,10 @@ def build_dataset_from_slices(data_list, labels_list=None, weighs=None, batch_si
             return parsed, labels
         else:
             return parsed, labels, weights
-
-    dataset = dataset.map(stack_decode_format, num_parallel_calls=AUTOTUNE)
+    if i3d:
+        dataset = dataset.map(i3d_stack_decode_format, num_parallel_calls=AUTOTUNE)
+    else:
+        dataset = dataset.map(stack_decode_format, num_parallel_calls=AUTOTUNE)
     if augment:
         dataset = dataset.map(augment, num_parallel_calls=AUTOTUNE)
     if batch_size>0:

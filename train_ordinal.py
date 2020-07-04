@@ -70,7 +70,7 @@ models_path.mkdir(parents=True, exist_ok=True)
 #     return x, y
 
 datalist = {x: read_from_annfile(root[x], annfile[x], y_range, ordinal=True) for x in ['train', 'val', 'test']}
-train_val_datalist = (datalist['train'][0]+datalist['val'][0], datalist['train'][1]+datalist['val'][1])
+train_val_datalist = [a+b for a, b in zip(datalist['train'], datalist['val'])]
 test_dataset = build_dataset_from_slices(*datalist['test'], batch_size=batch_size, shuffle=False)
 train_val_dataset = build_dataset_from_slices(*train_val_datalist, batch_size=batch_size)
 # %% Build and compile model
@@ -88,13 +88,12 @@ with strategy.scope():
     output = Activation('sigmoid')(x)
     model = Model(inputs, output)
     model_checkpoint = ModelCheckpoint(str(models_path.joinpath('{epoch:02d}-{val_mae_od:.2f}.h5')), period=5)
-    lr_sche = LearningRateScheduler(lr_schedule)
     # %% Fine tune
     backbone.trainable = True
     model.compile(loss=loss, optimizer=tf.keras.optimizers.Adam(learning_rate), metrics=[mae_od])
 
 ftune_his = model.fit(train_val_dataset, validation_data=test_dataset, epochs=epochs,
-                          callbacks=[model_checkpoint, wandbcb, lr_sche], verbose=1)
+                          callbacks=[model_checkpoint, wandbcb], verbose=1)
 
 # %% Save history to csv and images
 history = ftune_his.history
