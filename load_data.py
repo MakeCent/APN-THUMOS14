@@ -222,7 +222,7 @@ def find_imgs(video_path, suffix='jpg'):
     from pathlib import Path
     if isinstance(video_path, str):
         video_path = Path(video_path)
-    imgs_list = [str(jp) for jp in sorted(video_path.glob('*.{}'.format(suffix)))]
+    imgs_list = [[str(jp)] for jp in sorted(video_path.glob('*.{}'.format(suffix)))]
     return imgs_list
 
 

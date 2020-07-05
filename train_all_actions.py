@@ -17,10 +17,11 @@ from wandb.keras import WandbCallback
 import datetime
 import tensorflow as tf
 import socket
+
 agent = socket.gethostname()
 AUTOTUNE = tf.data.experimental.AUTOTUNE
 fix_bug()
-now = datetime.datetime.now().strftime("%Y-%m-%d-%H:%M:%S")
+now = datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
 # %% wandb Initialization
 # Configurations. If you don't use wandb, just manually set these values.
 default_config = dict(
@@ -28,12 +29,12 @@ default_config = dict(
     y_e=100,
     learning_rate=0.0001,
     batch_size=32,
-    epochs=30,
+    epochs=10,
     agent=agent
 )
 ordinal = True
 mode = 'rgb'
-stack_length = 1
+stack_length = 10
 weighted = False
 
 # Just for wandb
@@ -44,7 +45,7 @@ if weighted:
     tags.append("weighted")
 if stack_length > 1:
     tags.append("stack{}".format(stack_length))
-wandb.init(config=default_config, name=now, tags=tags, notes='baseline, all, od, rgb1')
+wandb.init(config=default_config, name=now, tags=tags, notes='all, od, rgb10')
 config = wandb.config
 wandbcb = WandbCallback(monitor='val_n_mae', save_model=False)
 
@@ -80,29 +81,32 @@ models_path.mkdir(parents=True, exist_ok=True)
 #     return x, y, w
 
 
-datalist = {x: read_from_anndir(root[x], anndir[x], mode=mode, y_range=y_range, ordinal=ordinal, stack_length=stack_length) for x in ['train', 'val', 'test']}
+datalist = {
+    x: read_from_anndir(root[x], anndir[x], mode=mode, y_range=y_range, ordinal=ordinal, stack_length=stack_length) for
+    x in ['train', 'val', 'test']}
 test_dataset = build_dataset_from_slices(*datalist['test'], batch_size=batch_size, shuffle=False)
-train_val_datalist = (datalist['train'][0]+datalist['val'][0], datalist['train'][1]+datalist['val'][1])
+train_val_datalist = (datalist['train'][0] + datalist['val'][0], datalist['train'][1] + datalist['val'][1])
 train_val_dataset = build_dataset_from_slices(*train_val_datalist, batch_size=batch_size)
 # %% Build and compile model
+lr_sche = LearningRateScheduler(lr_schedule)
 strategy = tf.distribute.MirroredStrategy()
+model_checkpoint = ModelCheckpoint(str(models_path.joinpath('{epoch:02d}-{val_multi_od_metric:.2f}.h5')), period=5)
 with strategy.scope():
-    inputs = tf.keras.Input(shape=(224, 224, 3))
-    backbone = ResNet101(weights='imagenet', input_shape=(224, 224, 3), pooling='avg', include_top=False)
-    x = backbone(inputs)
-    x = Dense(1024, activation='relu', kernel_initializer='he_uniform')(x)
+    backbone = ResNet101(weights='imagenet',
+                         input_shape=(224, 224, stack_length * 2 if mode == 'flow' else stack_length*3), pooling='avg',
+                         include_top=False)
+    x = Dense(1024, activation='relu', kernel_initializer='he_uniform')(backbone.input)
     x = Dropout(0.5)(x)
     x = Dense(1024, activation='relu', kernel_initializer='he_uniform')(x)
     x = Dropout(0.5)(x)
     x = Dense(action_num, kernel_initializer='he_uniform', use_bias=False)(x)
     x = MultiAction_BiasLayer(y_nums)(x)
     output = Activation('sigmoid')(x)
-    model = Model(inputs, output)
-    model_checkpoint = ModelCheckpoint(str(models_path.joinpath('{epoch:02d}-{val_multi_od_metric:.2f}.h5')), period=5)
-    lr_sche = LearningRateScheduler(lr_schedule)
+    model = Model(backbone.input, output)
     # %% Fine tune
     backbone.trainable = True
-    model.compile(loss=multi_binarycrossentropy, optimizer=tf.keras.optimizers.Adam(learning_rate), metrics=[multi_od_metric])
+    model.compile(loss=multi_binarycrossentropy, optimizer=tf.keras.optimizers.Adam(learning_rate),
+                  metrics=[multi_od_metric])
     ftune_his = model.fit(train_val_dataset, validation_data=test_dataset, epochs=epochs,
                           callbacks=[model_checkpoint, wandbcb, lr_sche], verbose=1)
 
@@ -114,11 +118,14 @@ plot_history(history_path, history)
 # %% Prediction on Untrimmed Videos
 import pandas as pd
 import numpy as np
-video_names = pd.read_csv("/mnt/louis-consistent/Datasets/THUMOS14/Information/test_videos.txt", header=None)
+
+video_names = pd.read_csv("/mnt/louis-consistent/Datasets/THUMOS14/Information/test_videos.txt", header=None).values.squeeze().tolist()
 untrimmed_predictions = {}
 ground_truth = {}
 for v in video_names:
-    gt = pd.read_csv("/mnt/louis-consistent/Datasets/THUMOS14/Information/video_wise_annotationF/test/{}_annotationF".format(v), header=None)
+    gt = pd.read_csv(
+        "/mnt/louis-consistent/Datasets/THUMOS14/Information/video_wise_annotationF/test/{}_annotationF".format(v),
+        header=None).values
     ground_truth[v] = gt
 
     video_path = Path(root['test'], v)
@@ -137,22 +144,24 @@ action_idx = {'BaseballPitch': 0, 'BasketballDunk': 1, 'Billiards': 2, 'CleanAnd
 iou = 0.5
 all_detected_action = {}
 KILL = True
-for v, p in untrimmed_predictions:
+for v, p in untrimmed_predictions.items():
     if ordinal:
         p = ordinal2completeness(p)
     v_ads = []
     for ac_name, ac_idx in action_idx.items():
         ac_prediction = p[:, ac_idx]
         ac_ads = action_search(ac_prediction, min_T=50, max_T=30, min_L=40)
-        ac_ads = np.c_[ac_ads, np.ones(ac_ads.shape[0]*ac_idx)]
+        ac_ads = np.c_[ac_ads, np.ones(ac_ads.shape[0]) * ac_idx]
         v_ads.append(v_ads)
     v_ads = np.vstack(v_ads)
     if KILL:
         iou_matrix = matrix_iou(v_ads[:, :2], v_ads[:, :2])
         while iou_matrix.max() > 0:
             max_idx = np.unravel_index(iou_matrix.argmax(), iou_matrix.shape)
-            iou_matrix= np.delete(iou_matrix, max_idx[0], axis=0) if v_ads[max_idx[0]][2] > v_ads[max_idx[1]][2] else np.delete(iou_matrix, max_idx[1], axis=1)
-            v_ads = np.delete(v_ads, max_idx[0], axis=0) if v_ads[max_idx[0]][2] > v_ads[max_idx[1]][2] else np.delete(v_ads, max_idx[1], axis=0)
+            iou_matrix = np.delete(iou_matrix, max_idx[0], axis=0) if v_ads[max_idx[0]][2] > v_ads[max_idx[1]][
+                2] else np.delete(iou_matrix, max_idx[1], axis=1)
+            v_ads = np.delete(v_ads, max_idx[0], axis=0) if v_ads[max_idx[0]][2] > v_ads[max_idx[1]][2] else np.delete(
+                v_ads, max_idx[1], axis=0)
         all_detected_action[v] = v_ads
     else:
         pass
@@ -180,5 +189,3 @@ for ac_gt in Path(anndir['test']).iterdir():
     ac_tp_values = np.hstack(list(ac_tps.values()))
     ac_ap = average_precision(ac_tp_values, ac_num_gt, ac_loss)
     ap[ac_name] = ac_ap
-
-
