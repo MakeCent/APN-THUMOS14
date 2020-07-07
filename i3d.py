@@ -53,9 +53,14 @@ action_num = 20
 
 # %% Parameters, Configuration, and Initialization
 model_name = now
-root = {'train': "/mnt/louis-consistent/Datasets/THUMOS14/Images/train",
-        'val': "/mnt/louis-consistent/Datasets/THUMOS14/Images/validation",
-        'test': "/mnt/louis-consistent/Datasets/THUMOS14/Images/test"}
+if mode == 'rgb':
+    root = {'train': "/mnt/louis-consistent/Datasets/THUMOS14/Images/train",
+            'val': "/mnt/louis-consistent/Datasets/THUMOS14/Images/validation",
+            'test': "/mnt/louis-consistent/Datasets/THUMOS14/Images/test"}
+else:
+    root = {'train': "/mnt/louis-consistent/Datasets/THUMOS14/Warped_OpticalFlows/train",
+            'val': "/mnt/louis-consistent/Datasets/THUMOS14/Warped_OpticalFlows/validation",
+            'test': "/mnt/louis-consistent/Datasets/THUMOS14/Warped_OpticalFlows/test"}
 anndir = {
     'train': "/mnt/louis-consistent/Datasets/THUMOS14/Annotations/train/annotationF",
     'val': "/mnt/louis-consistent/Datasets/THUMOS14/Annotations/validation/annotationF",

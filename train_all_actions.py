@@ -167,7 +167,7 @@ for v, p in untrimmed_predictions.items():
         pass
     all_detected_action[v] = v_ads
 
-all_detection = np.vstack(list(all_detected_action.values()))
+all_detection = np.array(list(all_detected_action.values()))
 
 all_tps = {}
 ap = {}
@@ -185,7 +185,7 @@ for ac_gt in Path(anndir['test']).iterdir():
         ac_v_detected = v_detected[v_detected[:, 3] == ac_idx]
         ac_v_tps = calc_truepositive(ac_v_detected, ac_v_gt, iou)
         ac_tps[v] = ac_v_tps
-    ac_loss = np.vstack(list(ac_detected.values()))[:, 2]
-    ac_tp_values = np.hstack(list(ac_tps.values()))
+    ac_loss = np.array(list(ac_detected.values()))[:, 2]
+    ac_tp_values = np.array(list(ac_tps.values())).flatten()
     ac_ap = average_precision(ac_tp_values, ac_num_gt, ac_loss)
     ap[ac_name] = ac_ap

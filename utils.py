@@ -229,7 +229,7 @@ def plot_prediction(video_prediction):
 def iou(a, b):
     ov = 0
     union = max(a[1], b[1]) - min(a[0], b[0])
-    intersection = min(a[1], b[1]) - max(a[0], a[0])
+    intersection = min(a[1], b[1]) - max(a[0], b[0])
     if intersection > 0:
         ov = intersection / union
     return ov
