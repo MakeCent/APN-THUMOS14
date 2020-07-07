@@ -8,7 +8,7 @@ from load_data import *
 from utils import *
 from custom_class import MultiAction_BiasLayer
 from pathlib import Path
-from tensorflow.keras.applications import ResNet101
+from tensorflow.keras.applications import ResNet101, ResNet50
 from tensorflow.keras.layers import Dense, Dropout, Activation, Reshape
 from tensorflow.keras import Model
 from tensorflow.keras.callbacks import ModelCheckpoint, LearningRateScheduler
@@ -16,6 +16,7 @@ import wandb
 from wandb.keras import WandbCallback
 import datetime
 import tensorflow as tf
+import numpy as np
 import socket
 agent = socket.gethostname()
 AUTOTUNE = tf.data.experimental.AUTOTUNE
@@ -27,15 +28,17 @@ default_config = dict(
     y_s=1,
     y_e=100,
     learning_rate=0.0001,
-    batch_size=32,
+    batch_size=8,
     epochs=30,
     agent=agent
 )
 ordinal = True
-mode = 'rgb'
-stack_length = 1
+mode = 'flow'
+stack_length = 10
 weighted = False
 
+cross_pre = True if mode == 'flow' else False
+partialBN = True if mode == 'flow' else False
 # Just for wandb
 tags = ['all', mode]
 if ordinal:
@@ -44,6 +47,10 @@ if weighted:
     tags.append("weighted")
 if stack_length > 1:
     tags.append("stack{}".format(stack_length))
+if cross_pre:
+    tags.append("cross-pre")
+if partialBN:
+    tags.append("partialBN")
 wandb.init(config=default_config, name=now, tags=tags, notes='baseline, all, od, rgb1')
 config = wandb.config
 wandbcb = WandbCallback(monitor='val_n_mae', save_model=False)
@@ -57,9 +64,14 @@ action_num = 20
 
 # %% Parameters, Configuration, and Initialization
 model_name = now
-root = {'train': "/mnt/louis-consistent/Datasets/THUMOS14/Images/train",
-        'val': "/mnt/louis-consistent/Datasets/THUMOS14/Images/validation",
-        'test': "/mnt/louis-consistent/Datasets/THUMOS14/Images/test"}
+if mode == 'rgb':
+    root = {'train': "/mnt/louis-consistent/Datasets/THUMOS14/Images/train",
+            'val': "/mnt/louis-consistent/Datasets/THUMOS14/Images/validation",
+            'test': "/mnt/louis-consistent/Datasets/THUMOS14/Images/test"}
+else:
+    root = {'train': "/mnt/louis-consistent/Datasets/THUMOS14/OpticalFlows/train",
+            'val': "/mnt/louis-consistent/Datasets/THUMOS14/OpticalFlows/validation",
+            'test': "/mnt/louis-consistent/Datasets/THUMOS14/OpticalFlows/test"}
 anndir = {
     'train': "/mnt/louis-consistent/Datasets/THUMOS14/Annotations/train/annotationF",
     'val': "/mnt/louis-consistent/Datasets/THUMOS14/Annotations/validation/annotationF",
@@ -86,18 +98,34 @@ train_val_datalist = (datalist['train'][0]+datalist['val'][0], datalist['train']
 train_val_dataset = build_dataset_from_slices(*train_val_datalist, batch_size=batch_size)
 # %% Build and compile model
 strategy = tf.distribute.MirroredStrategy()
+
+if cross_pre:
+    pretrained = ResNet50(weights='imagenet', input_shape=(224, 224, 3), pooling='avg', include_top=False)
+    weights = pretrained.layers[2].get_weights()[0]
+    biases = pretrained.layers[2].get_weights()[1]
+    flated_kernels = np.repeat(weights.mean(axis=2)[:, :, np.newaxis], stack_length*3 if mode == 'rgb' else stack_length*2, axis=2)
+
+
 with strategy.scope():
-    inputs = tf.keras.Input(shape=(224, 224, 3))
-    backbone = ResNet101(weights='imagenet', input_shape=(224, 224, 3), pooling='avg', include_top=False)
-    x = backbone(inputs)
-    x = Dense(1024, activation='relu', kernel_initializer='he_uniform')(x)
+    backbone = ResNet50(weights='imagenet' if mode == 'rgb' and stack_length == '1' else None,
+                         input_shape=(224, 224, stack_length * 3 if mode == 'rgb' else stack_length * 2), pooling='avg',
+                         include_top=False)
+    if partialBN:
+        backbone = insert_layer_nonseq(backbone, 'conv1_bn', bn_factory, position='replace', new_training=True, other_training=False)
+    if cross_pre:
+        backbone.layers[2].set_weights([flated_kernels, biases])
+        for layer in pretrained.layers:
+            if layer.name != 'conv1_conv' and layer.get_weights() != []:
+                backbone.get_layer(layer.name).set_weights(layer.get_weights())
+
+    x = Dense(1024, activation='relu', kernel_initializer='he_uniform')(backbone.input)
     x = Dropout(0.5)(x)
     x = Dense(1024, activation='relu', kernel_initializer='he_uniform')(x)
     x = Dropout(0.5)(x)
     x = Dense(action_num, kernel_initializer='he_uniform', use_bias=False)(x)
     x = MultiAction_BiasLayer(y_nums)(x)
     output = Activation('sigmoid')(x)
-    model = Model(inputs, output)
+    model = Model(backbone.input, output)
     model_checkpoint = ModelCheckpoint(str(models_path.joinpath('{epoch:02d}-{val_multi_od_metric:.2f}.h5')), period=5)
     lr_sche = LearningRateScheduler(lr_schedule)
     # %% Fine tune

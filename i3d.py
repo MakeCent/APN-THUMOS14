@@ -14,19 +14,19 @@ import socket
 agent = socket.gethostname()
 AUTOTUNE = tf.data.experimental.AUTOTUNE
 fix_bug()
-now = datetime.datetime.now().strftime("%Y-%m-%d-%H:%M:%S")
+now = datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
 # %% wandb Initialization
 # Configurations. If you don't use wandb, just manually set these values.
 default_config = dict(
     y_s=1,
     y_e=100,
     learning_rate=0.0001,
-    batch_size=64,
-    epochs=100,
+    batch_size=32,
+    epochs=20,
     agent=agent
 )
 ordinal = True
-mode = 'rgb'
+mode = 'flow'
 stack_length = 10
 weighted = False
 
@@ -38,7 +38,7 @@ if weighted:
     tags.append("weighted")
 if stack_length > 1:
     tags.append("stack{}".format(stack_length))
-wandb.init(config=default_config, name=now, tags=tags, notes='+stackRGB')
+wandb.init(config=default_config, name=now, tags=tags, notes='i3d-flow10')
 config = wandb.config
 wandbcb = WandbCallback(monitor='val_n_mae', save_model=False)
 
@@ -51,9 +51,14 @@ action_num = 20
 
 # %% Parameters, Configuration, and Initialization
 model_name = now
-root = {'train': "/mnt/louis-consistent/Datasets/THUMOS14/Images/train",
-        'val': "/mnt/louis-consistent/Datasets/THUMOS14/Images/validation",
-        'test': "/mnt/louis-consistent/Datasets/THUMOS14/Images/test"}
+if mode == 'rgb':
+    root = {'train': "/mnt/louis-consistent/Datasets/THUMOS14/Images/train",
+            'val': "/mnt/louis-consistent/Datasets/THUMOS14/Images/validation",
+            'test': "/mnt/louis-consistent/Datasets/THUMOS14/Images/test"}
+else:
+    root = {'train': "/mnt/louis-consistent/Datasets/THUMOS14/OpticalFlows/train",
+            'val': "/mnt/louis-consistent/Datasets/THUMOS14/OpticalFlows/validation",
+            'test': "/mnt/louis-consistent/Datasets/THUMOS14/OpticalFlows/test"}
 anndir = {
     'train': "/mnt/louis-consistent/Datasets/THUMOS14/Annotations/train/annotationF",
     'val': "/mnt/louis-consistent/Datasets/THUMOS14/Annotations/validation/annotationF",
@@ -73,16 +78,17 @@ models_path.mkdir(parents=True, exist_ok=True)
 #     return x, y
 
 datalist = {x: read_from_anndir(root[x], anndir[x], mode=mode, y_range=y_range, ordinal=ordinal, stack_length=stack_length) for x in ['train', 'val', 'test']}
-test_dataset = build_dataset_from_slices(*datalist['test'], batch_size=batch_size, shuffle=False, i3d=True)
+test_dataset = build_dataset_from_slices(*datalist['test'], batch_size=batch_size, shuffle=False, i3d=True, mode=mode)
 train_val_datalist = [a+b for a, b in zip(datalist['train'], datalist['val'])]
-train_val_dataset = build_dataset_from_slices(*train_val_datalist, batch_size=batch_size, i3d=True)
+train_val_dataset = build_dataset_from_slices(*train_val_datalist, batch_size=batch_size, i3d=True, mode=mode)
 n_mae = normalize_mae(y_nums)
+model_checkpoint = ModelCheckpoint(str(models_path.joinpath('{epoch:02d}-{val_multi_od_metric:.2f}.h5')), period=5)
 with tf.distribute.MirroredStrategy().scope():
-    rgb_model = Inception_Inflated3d(
+    model = Inception_Inflated3d(
         include_top=False,
-        weights='rgb_imagenet_and_kinetics',
-        input_shape=(10, 224, 224, 3))
-    x = tf.keras.layers.Reshape((1024,))(rgb_model.output)
+        weights='flow_imagenet_and_kinetics',
+        input_shape=(stack_length, 224, 224, 2))
+    x = tf.keras.layers.Reshape((1024,))(model.output)
     x = Dense(2048, activation='relu', kernel_initializer='he_uniform')(x)
     x = Dropout(0.5)(x)
     x = Dense(2048, activation='relu', kernel_initializer='he_uniform')(x)
@@ -90,7 +96,7 @@ with tf.distribute.MirroredStrategy().scope():
     x = Dense(action_num, kernel_initializer='he_uniform', use_bias=False)(x)
     x = MultiAction_BiasLayer(y_nums)(x)
     output = Activation('sigmoid')(x)
-    model = Model(rgb_model.input, output)
+    model = Model(model.input, output)
     model.compile(loss=multi_binarycrossentropy, optimizer=tf.keras.optimizers.Adam(learning_rate), metrics=[multi_od_metric])
 
-ftune_his = model.fit(train_val_dataset, validation_data=test_dataset, epochs=epochs, verbose=1)
+ftune_his = model.fit(train_val_dataset, validation_data=test_dataset, callbacks=[model_checkpoint, wandbcb], epochs=epochs, verbose=1)
