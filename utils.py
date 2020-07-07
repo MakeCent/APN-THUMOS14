@@ -442,3 +442,8 @@ def insert_layer_nonseq(model, layer_regex, insert_layer_factory, insert_layer_n
             model_outputs.append(x)
 
     return Model(inputs=model.inputs, outputs=model_outputs)
+
+
+def bn_factory():
+    from tensorflow.keras.layers import BatchNormalization
+    return BatchNormalization(name='conv1_bn')

@@ -33,7 +33,21 @@ default_config = dict(
     action="GolfSwing",
     agent=agent
 )
-wandb.init(config=default_config, name=now, notes='opf, od, 2048^2, dp0.9')
+ordinal = True
+mode = 'flow'
+stack_length = 10
+weighted = False
+
+# Just for wandb
+tags = ['all', mode]
+if ordinal:
+    tags.append("od")
+if weighted:
+    tags.append("weighted")
+if stack_length > 1:
+    tags.append("stack{}".format(stack_length))
+
+wandb.init(config=default_config, tags=tags, name=now, notes='opf, od, 2048^1')
 config = wandb.config
 wandbcb = WandbCallback(monitor='val_n_mae', save_model=False)
 
@@ -65,7 +79,7 @@ models_path.mkdir(parents=True, exist_ok=True)
 
 # %% Build dataset
 
-datalist = {x: read_from_annfile(root[x], annfile[x], y_range, ordinal=True, mode='flow', stack_length=10) for x in ['train', 'val', 'test']}
+datalist = {x: read_from_annfile(root[x], annfile[x], y_range, ordinal=ordinal, mode=mode, stack_length=stack_length) for x in ['train', 'val', 'test']}
 test_dataset = build_dataset_from_slices(*datalist['test'], batch_size=batch_size, shuffle=False)
 train_val_datalist = (datalist['train'][0]+datalist['val'][0], datalist['train'][1]+datalist['val'][1])
 train_val_dataset = build_dataset_from_slices(*train_val_datalist, batch_size=batch_size)
@@ -76,10 +90,6 @@ pretrained = ResNet101(weights='imagenet', input_shape=(224, 224, 3), pooling='a
 weights = pretrained.layers[2].get_weights()[0]
 biases = pretrained.layers[2].get_weights()[1]
 extended_kernels = np.repeat(weights.mean(axis=2)[:, :, np.newaxis], 20, axis=2)
-
-
-def bn_factory():
-    return BatchNormalization(name='conv1_bn')
 
 
 with strategy.scope():

@@ -148,7 +148,7 @@ def decode_img(file_path, label=None, weight=None):
 
 
 def build_dataset_from_slices(data_list, labels_list=None, weighs=None, batch_size=32, augment=None, shuffle=True,
-                              prefetch=True, i3d=False):
+                              prefetch=True, i3d=False, mode='rgb'):
     """
     Given image paths and labels, create tf.data.Dataset instance.
     :param data_list: List. Consists of strings. Each string is a path of one image.
@@ -186,6 +186,23 @@ def build_dataset_from_slices(data_list, labels_list=None, weighs=None, batch_si
         else:
             return parsed, labels, weights
 
+    def i3d_stack_flow_decode_format(filepath_list, labels=None, weights=None):
+        """Decode stacked image paths to stacked image tensors and format to desired format"""
+        filepath_list = tf.unstack(filepath_list, axis=-1)
+        flow_snip = []
+        for flow_x_path, flow_y_path in zip(filepath_list[::2], filepath_list[1::2]):
+            decoded_x = decode_img(flow_x_path)
+            decoded_y = decode_img(flow_y_path)
+            decoded_flow = tf.concat([decoded_x, decoded_y], axis=-1)
+            flow_snip.append(format_img(decoded_flow))
+        parsed = tf.stack(flow_snip, axis=0)
+        if labels is None:
+            return parsed
+        elif weighs is None:
+            return parsed, labels
+        else:
+            return parsed, labels, weights
+
     def stack_decode_format(filepath_list, labels=None, weights=None):
         """Decode stacked image paths to stacked image tensors and format to desired format"""
         filepath_list = tf.unstack(filepath_list, axis=-1)
@@ -201,7 +218,10 @@ def build_dataset_from_slices(data_list, labels_list=None, weighs=None, batch_si
         else:
             return parsed, labels, weights
     if i3d:
-        dataset = dataset.map(i3d_stack_decode_format, num_parallel_calls=AUTOTUNE)
+        if mode == 'rgb':
+            dataset = dataset.map(i3d_stack_decode_format, num_parallel_calls=AUTOTUNE)
+        else:
+            dataset = dataset.map(i3d_stack_flow_decode_format, num_parallel_calls=AUTOTUNE)
     else:
         dataset = dataset.map(stack_decode_format, num_parallel_calls=AUTOTUNE)
     if augment:
@@ -213,7 +233,7 @@ def build_dataset_from_slices(data_list, labels_list=None, weighs=None, batch_si
     return dataset
 
 
-def find_imgs(video_path, suffix='jpg'):
+def find_imgs(video_path, suffix='jpg', stack_length=1):
     """
     Find all images in a given path.
     :param video_path: String. Target video folder
@@ -222,8 +242,9 @@ def find_imgs(video_path, suffix='jpg'):
     from pathlib import Path
     if isinstance(video_path, str):
         video_path = Path(video_path)
-    imgs_list = [[str(jp)] for jp in sorted(video_path.glob('*.{}'.format(suffix)))]
-    return imgs_list
+    imgs_list = [str(jp) for jp in sorted(video_path.glob('*.{}'.format(suffix)))]
+    stacked_imgs_list = [imgs_list[i:i + stack_length] for i in range(0, len(imgs_list) - stack_length + 1)]
+    return stacked_imgs_list
 
 
 def find_flows(video_path, suffix='jpg', stack_length=10):
