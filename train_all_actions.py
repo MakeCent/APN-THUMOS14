@@ -160,7 +160,7 @@ for v, p in untrimmed_predictions.items():
         ac_prediction = p[:, ac_idx]
         ac_ads = action_search(ac_prediction, min_T=50, max_T=30, min_L=40)
         ac_ads = np.c_[ac_ads, np.ones(ac_ads.shape[0]) * ac_idx]
-        v_ads.append(v_ads)
+        v_ads.append(ac_ads)
     v_ads = np.vstack(v_ads)
     if KILL:
         iou_matrix = matrix_iou(v_ads[:, :2], v_ads[:, :2])

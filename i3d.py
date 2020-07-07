@@ -29,7 +29,7 @@ ordinal = True
 mode = 'rgb'
 stack_length = 10
 weighted = False
-notes = 'i3d_KI_flow10'
+notes = 'i3d_KI_rgb10'
 
 # Just for wandb
 tags = ['all', mode, 'i3d']
@@ -39,9 +39,9 @@ if weighted:
     tags.append("weighted")
 if stack_length > 1:
     tags.append("stack{}".format(stack_length))
-wandb.init(config=default_config, name=now, tags=tags, notes='i3d-flow10')
+wandb.init(config=default_config, name=now, tags=tags, notes=notes)
 config = wandb.config
-wandbcb = WandbCallback(monitor='val_n_mae', save_model=False)
+wandbcb = WandbCallback(monitor='val_multi_od_metric', save_model=False)
 
 y_range = (config.y_s, config.y_e)
 y_nums = y_range[1] - y_range[0] + 1
@@ -72,24 +72,17 @@ history_path.mkdir(parents=True, exist_ok=True)
 models_path.mkdir(parents=True, exist_ok=True)
 
 # %% Build dataset
-
-# def augment_func(x, y):
-#     import tensorflow as tf
-#     x = tf.image.random_flip_left_right(x)
-#     return x, y
-
 datalist = {x: read_from_anndir(root[x], anndir[x], mode=mode, y_range=y_range, ordinal=ordinal, stack_length=stack_length) for x in ['train', 'val', 'test']}
 test_dataset = build_dataset_from_slices(*datalist['test'], batch_size=batch_size, shuffle=False, i3d=True, mode=mode)
 train_val_datalist = [a+b for a, b in zip(datalist['train'], datalist['val'])]
 train_val_dataset = build_dataset_from_slices(*train_val_datalist, batch_size=batch_size, i3d=True, mode=mode)
-n_mae = normalize_mae(y_nums)
-model_checkpoint = ModelCheckpoint(str(models_path.joinpath('{epoch:02d}-{val_multi_od_metric:.2f}.h5')), period=5)
+model_checkpoint = ModelCheckpoint(str(models_path.joinpath('{epoch:02d}-{val_multi_od_metric:.2f}.h5')), period=1)
 with tf.distribute.MirroredStrategy().scope():
-    model = Inception_Inflated3d(
+    backbone = Inception_Inflated3d(
         include_top=False,
-        weights='{}_imagenet_and_kinetics'.format(mode),
-        input_shape=(stack_length*2 if mode == 'flow' else stack_length, 224, 224, 3))
-    x = tf.keras.layers.Reshape((1024,))(model.output)
+        weights='flow_imagenet_and_kinetics',
+        input_shape=(stack_length, 224, 224, 3 if mode == 'rgb' else 2))
+    x = tf.keras.layers.Reshape((1024,))(backbone.output)
     x = Dense(2048, activation='relu', kernel_initializer='he_uniform')(x)
     x = Dropout(0.5)(x)
     x = Dense(2048, activation='relu', kernel_initializer='he_uniform')(x)
@@ -97,7 +90,91 @@ with tf.distribute.MirroredStrategy().scope():
     x = Dense(action_num, kernel_initializer='he_uniform', use_bias=False)(x)
     x = MultiAction_BiasLayer(y_nums)(x)
     output = Activation('sigmoid')(x)
-    model = Model(model.input, output)
+    model = Model(backbone.input, output)
     model.compile(loss=multi_binarycrossentropy, optimizer=tf.keras.optimizers.Adam(learning_rate), metrics=[multi_od_metric])
 
 ftune_his = model.fit(train_val_dataset, validation_data=test_dataset, callbacks=[model_checkpoint, wandbcb], epochs=epochs, verbose=1)
+
+# %% Save history to csv and images
+history = ftune_his.history
+save_history(history_path, history)
+plot_history(history_path, history)
+
+# %% Prediction on Untrimmed Videos
+import pandas as pd
+import numpy as np
+
+video_names = pd.read_csv("/mnt/louis-consistent/Datasets/THUMOS14/Information/test_videos.txt", header=None).values.squeeze().tolist()
+untrimmed_predictions = {}
+ground_truth = {}
+for v in video_names:
+    gt = pd.read_csv(
+        "/mnt/louis-consistent/Datasets/THUMOS14/Information/video_wise_annotationF/test/{}_annotationF".format(v),
+        header=None).values
+    ground_truth[v] = gt
+
+    video_path = Path(root['test'], v)
+    img_list = find_imgs(video_path)
+
+    ds = build_dataset_from_slices(img_list, batch_size=1, shuffle=False)
+    untrimmed_prediction = model.predict(ds, verbose=1)
+    untrimmed_predictions[v] = np.squeeze(untrimmed_prediction)
+
+action_idx = {'BaseballPitch': 0, 'BasketballDunk': 1, 'Billiards': 2, 'CleanAndJerk': 3, 'CliffDiving': 4,
+              'CricketBowling': 5, 'CricketShot': 6, 'Diving': 7, 'FrisbeeCatch': 8, 'GolfSwing': 9,
+              'HammerThrow': 10, 'HighJump': 11, 'JavelinThrow': 12, 'LongJump': 13, 'PoleVault': 14, 'Shotput': 15,
+              'SoccerPenalty': 16, 'TennisSwing': 17, 'ThrowDiscus': 18, 'VolleyballSpiking': 19}
+
+iou = 0.5
+all_detected_action = {}
+KILL = True
+ordinal = True
+for v, p in untrimmed_predictions.items():
+    if ordinal:
+        p = ordinal2completeness(p)
+    v_ads = []
+    for ac_name, ac_idx in action_idx.items():
+        ac_prediction = p[:, ac_idx]
+        ac_ads = action_search(ac_prediction, min_T=80, max_T=20, min_L=50)
+        ac_ads = np.c_[ac_ads, np.ones(ac_ads.shape[0]) * ac_idx]
+        v_ads.append(ac_ads)
+    v_ads = np.vstack(v_ads)
+    if KILL:
+        iou_matrix = matrix_iou(v_ads[:, :2], v_ads[:, :2])
+        if iou_matrix.size > 0:
+            for i in range(iou_matrix.shape[0]):
+                iou_matrix[i, i] = 0
+            while iou_matrix.max() > 0 and iou:
+                max_idx = np.unravel_index(iou_matrix.argmax(), iou_matrix.shape)
+                iou_matrix = np.delete(np.delete(iou_matrix, max_idx[0], axis=0), max_idx[0], axis=1) if v_ads[max_idx[0]][2] > v_ads[max_idx[1]][
+                    2] else np.delete(np.delete(iou_matrix, max_idx[1], axis=0), max_idx[1], axis=1)
+                v_ads = np.delete(v_ads, max_idx[0], axis=0) if v_ads[max_idx[0]][2] > v_ads[max_idx[1]][2] else np.delete(
+                    v_ads, max_idx[1], axis=0)
+            all_detected_action[v] = v_ads
+        else:
+            all_detected_action[v] = v_ads
+    else:
+        all_detected_action[v] = v_ads
+
+all_detection = np.vstack(list(all_detected_action.values()))
+
+all_tps = {}
+ap = {}
+for ac_gt in Path(anndir['test']).iterdir():
+    ac_name = ac_gt.stem.split('_')[0]
+    ac_idx = action_idx[ac_name]
+    ac_ta = pd.read_csv(str(ac_gt), header=None).values
+    ac_num_gt = ac_ta.shape[0]
+    ac_v = ac_ta[:, 0].squeeze().tolist()
+    ac_tps = {}
+    ac_detected = {}
+    for v in ac_v:
+        ac_v_gt = ac_ta[ac_ta[:, 0] == v][:, 1:3]
+        v_detected = all_detected_action[v]
+        ac_v_detected = v_detected[v_detected[:, 3] == ac_idx]
+        ac_v_tps = calc_truepositive(ac_v_detected, ac_v_gt, iou)
+        ac_tps[v] = ac_v_tps
+    ac_loss = np.vstack(list(ac_detected.values()))[:, 2]
+    ac_tp_values = np.hstack(list(ac_tps.values()))
+    ac_ap = average_precision(ac_tp_values, ac_num_gt, ac_loss)
+    ap[ac_name] = ac_ap
