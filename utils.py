@@ -247,8 +247,8 @@ def matrix_iou(gt, ads):
 def calc_truepositive(action_detected, temporal_annotations, iou_T):
     """
     Give the predicted action intervals and ground truth intervals, using IoU threshold to get true positive proposals.
-    :param action_detected: Array. Shape (N, 3). Float. 1st and 2st columns contain start and ending frame indexes of detected actions.
-            3st column for confidence/loss. Here is for loss, which means tp will be sort with ascend order.
+    :param action_detected: Array. Shape (N, 4). Float. 1st and 2st columns contain start and ending frame indexes of detected actions.
+            3st column for confidence/loss. Here is for loss, which means tp will be sort with ascend order. 4st for action index.
     :param temporal_annotations: Array. Shape (M, 2). Float. 1st and 2st columns contain start and ending frame indexes of ground truthes.
     :param iou_T: Float. IoU thredhold. A detected action can be true positive only if it has IoU larger than threhold with a ground truth.
     :return: Array. Shape (N,). Composing 0 and 1 corresponding to each detected action, 1 means true positive.
@@ -262,10 +262,11 @@ def calc_truepositive(action_detected, temporal_annotations, iou_T):
     while True:
         max_idx = np.unravel_index(iou_matrix.argmax(), iou_matrix.shape)
         if iou_matrix[max_idx] > iou_T:
+            iou_matrix[:, max_idx[1]] = 0
+            iou_matrix[max_idx[0], :] = 0
             tp[max_idx[1]] = 1
         else:
             break
-        iou_matrix[max_idx[0], :],  iou_matrix[:, max_idx[1]] = 0, 0
     return tp
 
 
