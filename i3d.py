@@ -26,10 +26,10 @@ default_config = dict(
     agent=agent
 )
 ordinal = True
-mode = 'rgb'
+mode = 'w_flow'
 stack_length = 10
 weighted = False
-notes = 'i3d_KI_flow10'
+notes = 'i3d_KI_wflow10'
 
 # Just for wandb
 tags = ['all', mode, 'i3d']
