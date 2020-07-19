@@ -192,7 +192,7 @@ def boxplot_split(split_as, split_on):
 def get_boxplot(labels, n_maes):
     import numpy as np
     from matplotlib import pyplot as plt
-    split_for_box = boxplot_split(np.arrat(labels), np.array(n_maes))
+    split_for_box = boxplot_split(np.array(labels), np.array(n_maes))
     plt.figure()
     plt.boxplot(split_for_box)
     plt.show()
@@ -226,7 +226,7 @@ def plot_prediction(video_prediction):
     plt.show()
 
 
-def iou(a, b):
+def compute_iou(a, b):
     ov = 0
     union = max(a[1], b[1]) - min(a[0], b[0])
     intersection = min(a[1], b[1]) - max(a[0], b[0])
@@ -240,7 +240,7 @@ def matrix_iou(gt, ads):
     ov_m = np.zeros([gt.shape[0], ads.shape[0]])
     for i in range(gt.shape[0]):
         for j in range(ads.shape[0]):
-            ov_m[i, j] = iou(gt[i, :], ads[j, :])
+            ov_m[i, j] = compute_iou(gt[i, :], ads[j, :])
     return ov_m
 
 
@@ -346,12 +346,6 @@ def action_search(completeness_array, min_T, max_T, min_L):
     min_T, max_T, min_L = 75, 20, 35
     """
 
-    def is_intersect(a, b):
-        if a[0] > b[1] or a[1] < b[0]:
-            return False
-        else:
-            return True
-
     P = completeness_array.squeeze()
     C_startframe = np.where(P < max_T)[0]  # "C_" represent variable for candidates.
     C_endframe = np.where(P > min_T)[0]
@@ -366,85 +360,70 @@ def action_search(completeness_array, min_T, max_T, min_L):
                 action_candidate = [s_i, e_i, mse]
                 any_intersection = False
                 beat_any_one = False
-                for i, action in enumerate(action_detected):
-                    if is_intersect(action, action_candidate):
-                        any_intersection = True
-                        if action_candidate[2] < action[2]:
-                            beat_any_one = True
-                            action_detected.pop(i)
-                if beat_any_one or not any_intersection:
-                    action_detected.append(action_candidate)
+                if mse < 833:
+                    for i, action in enumerate(action_detected):
+                        iou_e = compute_iou(action, action_candidate)
+                        # if iou_e > 0.95:
+                        #     any_intersection = True
+                        #     beat_any_one = False
+                        #     break
+                        if iou_e > 0:
+                            any_intersection = True
+                            if action_candidate[2] < action[2]:
+                                beat_any_one = True
+                                action_detected.pop(i)
+
+                    if beat_any_one or not any_intersection:
+                        action_detected.append(action_candidate)
     action_detected.sort(key=lambda x: x[2])
     return np.array(action_detected).reshape(-1, 3)
 
 
-def insert_layer_nonseq(model, layer_regex, insert_layer_factory, insert_layer_name=None, position='after',
-                        new_training=None, other_training=None):
-    import re
-    from tensorflow.keras.models import Model
-    # Auxiliary dictionary to describe the network graph
-    network_dict = {'input_layers_of': {}, 'new_output_tensor_of': {}}
+def action_ap(predictions, temporal_annotations, IoU, min_T=60, max_T=30, min_L=60, down_sampling=1, action_idx=None, return_detections=True):
+    """
+    Calculate average precision for one action class.
+    :param predictions: Dict {Video name(Str): Array}. Predicted action progression sequences of test videos
+    :param temporal_annotations: Array. Shape [N, 3]. First column for video names, 2nd and 3nd for start and end frames indexs.
+    :param IoU: Float. IoU thresholds.
+    :param min_T: Int or Float. Arguments for function "action search". Minimum action progression threshold for ending frames.
+    :param max_T: Int or Float. Arguments for function "action search". Maximum action progression threshold for starting frames.
+    :param min_L: Int or Float. Arguments for function "action search". Minimum action length threshold.
+    :param down_sampling: Int. If larger than 1, then down-sampling the predictions sequence.
+    :param action_idx: Int or None. If not None, which means the prediction arrays are for multi-tasks, then
+    a slicing operation  will be conducted on the prediction array to get prediction of specific action by action_idx.
+    :param return_detections: Boolean. If True, then detections and ground truth will also be returned.
+    :return: Float or Tuple. If return_detections is True then return (ap(Float), detections(Dict), ground_truths(Dict))
+    else return ap(Float).
+    """
+    import numpy as np
+    video_list = np.unique(temporal_annotations[:, 0])
+    detections = {}
+    grount_truths = {}
+    true_positives = {}
 
-    # Set the input layers of each layer
-    for layer in model.layers:
-        for node in layer._outbound_nodes:
-            layer_name = node.outbound_layer.name
-            if layer_name not in network_dict['input_layers_of']:
-                network_dict['input_layers_of'].update(
-                    {layer_name: [layer.name]})
-            else:
-                network_dict['input_layers_of'][layer_name].append(layer.name)
+    for v in video_list:
+        v_temporal_annotations = temporal_annotations[temporal_annotations[:, 0] == v][:, 1:]
+        v_predictions = predictions[v]
 
-    # Set the output tensor of the input layer
-    network_dict['new_output_tensor_of'].update(
-        {model.layers[0].name: model.input})
+        if action_idx is not None:
+            v_predictions = v_predictions[:, action_idx]
+        if down_sampling > 1:
+            v_predictions = v_predictions[::down_sampling]
+            v_temporal_annotations = v_temporal_annotations // down_sampling
 
-    # Iterate over all layers after the input
-    model_outputs = []
-    for layer in model.layers[1:]:
+        v_detections = action_search(v_predictions, min_T=min_T, max_T=max_T, min_L=min_L)
+        v_true_positives = calc_truepositive(v_detections, v_temporal_annotations, IoU)
+        detections[v] = v_detections
+        true_positives[v] = v_true_positives
+        grount_truths[v] = v_temporal_annotations
 
-        # Determine input tensors
-        layer_input = [network_dict['new_output_tensor_of'][layer_aux]
-                       for layer_aux in network_dict['input_layers_of'][layer.name]]
-        if len(layer_input) == 1:
-            layer_input = layer_input[0]
+    num_of_ground_truth = temporal_annotations.shape[0]
+    losses = np.vstack(list(detections.values()))[:, 2]
+    true_positives_array = np.hstack(list(true_positives.values()))
+    ap = average_precision(true_positives_array, num_of_ground_truth, losses)
 
-        # Insert layer if name matches the regular expression
-        if re.match(layer_regex, layer.name):
-            if position == 'replace':
-                x = layer_input
-            elif position == 'after':
-                x = layer(layer_input)
-            elif position == 'before':
-                pass
-            else:
-                raise ValueError('position must be: before, after or replace')
+    if return_detections:
+        return ap, detections, grount_truths
+    else:
+        return ap
 
-            new_layer = insert_layer_factory()
-            # if insert_layer_name:
-            #     new_layer.name = insert_layer_name
-            # else:
-            #     new_layer.name = '{}_{}'.format(layer.name,
-            #                                     new_layer.name)
-            x = new_layer(x, training=new_training)
-            print('New layer: {} Old layer: {} Type: {}'.format(new_layer.name,
-                                                                layer.name, position))
-            if position == 'before':
-                x = layer(x, training=new_training)
-        else:
-            x = layer(layer_input, training=other_training)
-
-        # Set new output tensor (the original one, or the one of the inserted
-        # layer)
-        network_dict['new_output_tensor_of'].update({layer.name: x})
-
-        # Save tensor in output list if it is output in initial model
-        if layer.name in model.output_names:
-            model_outputs.append(x)
-
-    return Model(inputs=model.inputs, outputs=model_outputs)
-
-
-def bn_factory():
-    from tensorflow.keras.layers import BatchNormalization
-    return BatchNormalization(name='conv1_bn')
