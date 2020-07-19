@@ -83,13 +83,11 @@ def read_from_annfile(root, annfile, y_range, mode='rgb', ordinal=False,
         if mode == 'rgb':
             v_paths = ["{}/{}/{}.jpg".format(root, video, str(num).zfill(5)) for num in np.arange(start, end + 1)]
             v_stacked_paths = [v_paths[i:i + stack_length] for i in range(0, len(v_paths) - stack_length + 1)]
-        elif mode == 'flow':
+        else:
             v_paths = ["{}/{}/{}/{}_{}.jpg".format(root, video, d, d, str(num + 1).zfill(5)) for num in
                        np.arange(start, end) for d in ['flow_x', 'flow_y']]
             v_stacked_paths = [v_paths[2 * i:2 * i + stack_length * 2] for i in
                                range(0, len(v_paths) // 2 - stack_length + 1)]
-        else:
-            raise ValueError("only support 'rgb' or 'flow' for mode argument")
         stacked_list.extend(v_stacked_paths)
 
         v_stacked_length = len(v_stacked_paths)
