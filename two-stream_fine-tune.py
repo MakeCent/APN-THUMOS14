@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 # -*- coding: utf-8 -*-
-# File  : two-stream.py
+# File  : two-stream_fine-tune.py
 # Author: Chongkai LU
 # Date  : 7/2/2020
 import tensorflow as tf

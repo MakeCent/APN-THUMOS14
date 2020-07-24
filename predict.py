@@ -3,12 +3,13 @@
 # File  : train.py.py
 # Author: Chongkai LU
 # Date  : 6/9/2020
-import numpy as np
-from custom_class import *
+
+from tools.custom_class import *
+from tools.load_data import *
+from tools.utils import *
 from pathlib import Path
+import numpy as np
 import tensorflow as tf
-from load_data import *
-from utils import *
 
 # %% Test on a Untrimmed video
 action = "GolfSwing"
