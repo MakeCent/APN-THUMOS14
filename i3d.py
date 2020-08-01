@@ -27,10 +27,10 @@ default_config = dict(
     y_e=100,
     learning_rate=0.0001,
     batch_size=32,
-    epochs=20,
+    epochs=50,
     agent=agent,
     action='GolfSwing',
-    mode='flow'
+    mode='rgb'
 )
 ordinal = True
 mode = default_config['mode']

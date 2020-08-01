@@ -58,21 +58,29 @@ def generate_labels(length, y_range, ordinal=False, multi_action=False, action_i
             return completeness
 
 
-def read_from_annfile(root, annfile, y_range, mode='rgb', ordinal=False,
-                      stack_length=1, multi_action=False, action_index=0, weighted=False):
+def path_rgb2flow(rgb_path):
+    import tensorflow as tf
+    q = tf.strings.split(rgb_path, sep='/')
+    flow_x_path = q[:-1] + tf.constant('/flow_x/flow_x_') + tf.strings.as_string(
+        tf.strings.to_number(tf.strings.split(q[-1], sep='.')[0], out_type=tf.dtypes.int64) + 1, width=5,
+        fill='0') + tf.constant('.jpg')
+    flow_y_path = q[:-1] + tf.constant('/flow_y/flow_y_') + tf.strings.as_string(
+        tf.strings.to_number(tf.strings.split(q[-1], sep='.')[0], out_type=tf.dtypes.int64) + 1, width=5,
+        fill='0') + tf.constant('.jpg')
+    return tf.stack([flow_x_path, flow_y_path])
+
+
+def read_from_annfile(root, annfile, mode='rgb', stack_length=1, weighted=False, **kwargs):
     """
     According to the temporal annotation file of a action. Create list of image paths and list of labels.
-    :param root: String. Directory where all images are stored.
+    :param root. String. Path where all images locate.
     :param annfile: String. Path where temporal annotation locates.
-    :param y_range: Tuple. Label range.
     :param mode: String. Optical flow or RGB mode.
-    :param ordinal: Boolean. Label format using ordinal regression or not. E.g., 3 --> [1, 1, 1, 0, 0, ....]
     :param stack_length: Int. Number of input images stacked for training unit. Default 1 for RGB,
     For optical flow, default 10 (finally will get 20 since both u and v).
-    :param multi_action: Boolean. If true, label will be assign a action_index along aside for indicating its action class
-    :param action_index: Int. Only used when multi_action is True, representing the action_index for this action.
     :param weighted: Boolean. If true, the samples with completeness in two side will be put more weights and this function
     will also return a sample-wise weights list.
+    :param kwargs: Dict. Arguments passed to function "generate_labels"
     :return: List, List. List of image paths and list of labels and list of weights (if weighted=True).
     """
     import pandas as pd
@@ -92,7 +100,7 @@ def read_from_annfile(root, annfile, y_range, mode='rgb', ordinal=False,
         stacked_list.extend(v_stacked_paths)
 
         v_stacked_length = len(v_stacked_paths)
-        labels.extend(generate_labels(v_stacked_length, y_range, ordinal, multi_action, action_index))
+        labels.extend(generate_labels(v_stacked_length, **kwargs))
         if weighted:
             w_10 = [3, 2, 1, 1, 1, 1, 1, 1, 2, 3]
             weights.extend(np.hstack([w * p for w, p in zip(w_10, np.array_split(np.ones(v_stacked_length), 10))]))
@@ -104,8 +112,9 @@ def read_from_anndir(root, anndir, **kwargs):
     """
     Warped function for "read_from_annfile" to read multiple annfiles in an directory for multiple actions.
     According to the temporal annotation files. Create list of image paths and list of labels.
-    :param root: String. Directory where all images are stored.
+    :param root. String. Path where all images locate.
     :param anndir: String. Path where temporal annotation locates.
+    :param kwargs: Dict. Arguments passed to function "generate_labels"
     :return: List, List. List of image paths and list of labels.
     """
     from pathlib import Path
@@ -118,13 +127,94 @@ def read_from_anndir(root, anndir, **kwargs):
     datalist, ylist = [], []
     for annfile in sorted(Path(anndir).iterdir()):
         action_name = str(annfile.stem).split('_')[0]
-        action_list, label_list = read_from_annfile(root, str(annfile), multi_action=True, action_index=action_idx[action_name], **kwargs)
+        action_list, label_list = read_from_annfile(root=root, annfile=str(annfile), multi_action=True,
+                                                    action_index=action_idx[action_name], **kwargs)
         datalist.extend(action_list)
         ylist.extend(label_list)
     return datalist, ylist
 
 
-# %% Basic function: Can be easily used in other programs.
+def thumo14_parse_builder(mode='rgb', i3d=False):
+    import tensorflow as tf
+
+    def i3d_stack_decode_format(filepath_list, labels=None, weights=None):
+        """Decode stacked image paths to stacked image tensors and format to desired format"""
+        filepath_list = tf.unstack(filepath_list, axis=-1)
+        flow_snip = []
+        for flow_path in filepath_list:
+            decoded = decode_img(flow_path)
+            flow_snip.append(format_img(decoded))
+        parsed = tf.stack(flow_snip, axis=0)
+        if labels is None:
+            return parsed
+        elif weights is None:
+            return parsed, labels
+        else:
+            return parsed, labels, weights
+
+    def i3d_stack_flow_decode_format(filepath_list, labels=None, weights=None):
+        """Decode stacked image paths to stacked image tensors and format to desired format"""
+        filepath_list = tf.unstack(filepath_list, axis=-1)
+        flow_snip = []
+        for flow_x_path, flow_y_path in zip(filepath_list[::2], filepath_list[1::2]):
+            decoded_x = decode_img(flow_x_path)
+            decoded_y = decode_img(flow_y_path)
+            decoded_flow = tf.concat([decoded_x, decoded_y], axis=-1)
+            flow_snip.append(format_img(decoded_flow))
+        parsed = tf.stack(flow_snip, axis=0)
+        if labels is None:
+            return parsed
+        elif weights is None:
+            return parsed, labels
+        else:
+            return parsed, labels, weights
+
+    def i3d_two_stream_decode_format(filepath_list, labels=None, weights=None):
+        """Decode stacked image paths to stacked image tensors and format to desired format"""
+        rgb = i3d_stack_decode_format(filepath_list)
+
+        flow_list = tf.map_fn(path_rgb2flow, filepath_list)
+        flow_list = tf.reshape(flow_list, [-1])
+        flow = i3d_stack_flow_decode_format(flow_list)
+        if labels is None:
+            return rgb, flow
+        elif weights is None:
+            return (rgb, flow), labels
+        else:
+            return (rgb, flow), labels, weights
+
+    def stack_decode_format(filepath_list, labels=None, weights=None):
+        """Decode stacked image paths to stacked image tensors and format to desired format"""
+        filepath_list = tf.unstack(filepath_list, axis=-1)
+        flow_snip = []
+        for flow_path in filepath_list:
+            decoded = decode_img(flow_path)
+            flow_snip.append(format_img(decoded))
+        parsed = tf.concat(flow_snip, axis=-1)
+        if labels is None:
+            return parsed
+        elif weights is None:
+            return parsed, labels
+        else:
+            return parsed, labels, weights
+
+    if i3d:
+        if mode == 'rgb':
+            parse_function = i3d_stack_decode_format
+        elif mode == 'flow' or 'w_flow':
+            parse_function = i3d_stack_flow_decode_format
+        elif mode == 'two_stream':
+            parse_function = i3d_two_stream_decode_format
+        else:
+            raise TypeError(
+                "Please input 'mode' type in (rgb, flow, w_flow, two_stream) for function 'build_dataset_from_slices'")
+    else:
+        parse_function = stack_decode_format
+
+    return parse_function
+
+
+# %% Basic function: Can be used in other programs.
 
 
 def decode_img(file_path, label=None, weight=None):
@@ -146,8 +236,17 @@ def decode_img(file_path, label=None, weight=None):
         return img, label, weight
 
 
-def build_dataset_from_slices(data_list, labels_list=None, weighs=None, batch_size=32, augment=None, shuffle=True,
-                              prefetch=True, i3d=False, mode='rgb'):
+def decode_img_relative(root):
+    import os
+    def decode_img_with_root(file_path, label=None, weight=None):
+        absolute_paths = [os.path.join(root, p) for p in file_path]
+        return decode_img(absolute_paths, label, weight)
+
+    return decode_img_with_root
+
+
+def build_dataset_from_slices(data_list, labels_list=None, weighs=None, parse_func=None, batch_size=32, augment=None,
+                              shuffle=True, prefetch=True):
     """
     Given image paths and labels, create tf.data.Dataset instance.
     :param data_list: List. Consists of strings. Each string is a path of one image.
@@ -170,77 +269,11 @@ def build_dataset_from_slices(data_list, labels_list=None, weighs=None, batch_si
     if shuffle:
         dataset = dataset.shuffle(len(data_list))
 
-    def i3d_stack_decode_format(filepath_list, labels=None, weights=None):
-        """Decode stacked image paths to stacked image tensors and format to desired format"""
-        filepath_list = tf.unstack(filepath_list, axis=-1)
-        flow_snip = []
-        for flow_path in filepath_list:
-            decoded = decode_img(flow_path)
-            flow_snip.append(format_img(decoded))
-        parsed = tf.stack(flow_snip, axis=0)
-        if labels is None:
-            return parsed
-        elif weighs is None:
-            return parsed, labels
-        else:
-            return parsed, labels, weights
+    dataset = dataset.map(parse_func)
 
-    def i3d_stack_flow_decode_format(filepath_list, labels=None, weights=None):
-        """Decode stacked image paths to stacked image tensors and format to desired format"""
-        filepath_list = tf.unstack(filepath_list, axis=-1)
-        flow_snip = []
-        for flow_x_path, flow_y_path in zip(filepath_list[::2], filepath_list[1::2]):
-            decoded_x = decode_img(flow_x_path)
-            decoded_y = decode_img(flow_y_path)
-            decoded_flow = tf.concat([decoded_x, decoded_y], axis=-1)
-            flow_snip.append(format_img(decoded_flow))
-        parsed = tf.stack(flow_snip, axis=0)
-        if labels is None:
-            return parsed
-        elif weighs is None:
-            return parsed, labels
-        else:
-            return parsed, labels, weights
-
-    def i3d_two_stream_decode_format(filepath_list, labels=None, weights=None):
-        """Decode stacked image paths to stacked image tensors and format to desired format"""
-        rgb = i3d_stack_decode_format(filepath_list[0])
-        flow = i3d_stack_flow_decode_format(filepath_list[1])
-        if labels is None:
-            return rgb, flow
-        elif weighs is None:
-            return (rgb, flow), labels
-        else:
-            return (rgb, flow), labels, weights
-
-    def stack_decode_format(filepath_list, labels=None, weights=None):
-        """Decode stacked image paths to stacked image tensors and format to desired format"""
-        filepath_list = tf.unstack(filepath_list, axis=-1)
-        flow_snip = []
-        for flow_path in filepath_list:
-            decoded = decode_img(flow_path)
-            flow_snip.append(format_img(decoded))
-        parsed = tf.concat(flow_snip, axis=-1)
-        if labels is None:
-            return parsed
-        elif weighs is None:
-            return parsed, labels
-        else:
-            return parsed, labels, weights
-    if i3d:
-        if mode == 'rgb':
-            dataset = dataset.map(i3d_stack_decode_format, num_parallel_calls=AUTOTUNE)
-        elif mode == 'flow' or 'w_flow':
-            dataset = dataset.map(i3d_stack_flow_decode_format, num_parallel_calls=AUTOTUNE)
-        elif mode == 'two_stream':
-            dataset = dataset.map(i3d_two_stream_decode_format, num_parallel_calls=AUTOTUNE)
-        else:
-            raise TypeError("Please input 'mode' type in (rgb, flow, w_flow, two_stream) for function 'build_dataset_from_slices'")
-    else:
-        dataset = dataset.map(stack_decode_format, num_parallel_calls=AUTOTUNE)
     if augment:
         dataset = dataset.map(augment, num_parallel_calls=AUTOTUNE)
-    if batch_size>0:
+    if batch_size > 0:
         dataset = dataset.batch(batch_size)
     if prefetch:
         dataset = dataset.prefetch(buffer_size=AUTOTUNE)

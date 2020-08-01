@@ -12,12 +12,9 @@ from __future__ import absolute_import
 import os
 import warnings
 
-import numpy as np
-from utils import *
 from tensorflow.keras.models import Model
 from tensorflow.keras import layers
 from tensorflow.keras.layers import Activation
-from tensorflow.keras.layers import Dense
 from tensorflow.keras.layers import Input
 from tensorflow.keras.layers import BatchNormalization
 from tensorflow.keras.layers import Conv3D
@@ -26,9 +23,7 @@ from tensorflow.keras.layers import AveragePooling3D
 from tensorflow.keras.layers import Dropout
 from tensorflow.keras.layers import Reshape
 from tensorflow.keras.layers import Lambda
-from tensorflow.keras.layers import GlobalAveragePooling3D
 
-import tensorflow as tf
 from tensorflow.keras.utils import convert_all_kernels_in_model
 from tensorflow.keras.utils import get_file
 from tensorflow.keras import backend as K

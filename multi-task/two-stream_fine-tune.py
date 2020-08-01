@@ -15,28 +15,22 @@ y_nums = 100
 y_range = (1, 100)
 batch_size = 32
 
-rgb_root = {'train': "/mnt/louis-consistent/Datasets/THUMOS14/Images/train",
+root = {'train': "/mnt/louis-consistent/Datasets/THUMOS14/Images/train",
             'val': "/mnt/louis-consistent/Datasets/THUMOS14/Images/validation",
             'test': "/mnt/louis-consistent/Datasets/THUMOS14/Images/test"}
-flow_root = {'train': "/mnt/louis-consistent/Datasets/THUMOS14/OpticalFlows/train",
-             'val': "/mnt/louis-consistent/Datasets/THUMOS14/OpticalFlows/validation",
-             'test': "/mnt/louis-consistent/Datasets/THUMOS14/OpticalFlows/test"}
 anndir = {
     'train': "/mnt/louis-consistent/Datasets/THUMOS14/Annotations/train/annotationF",
     'val': "/mnt/louis-consistent/Datasets/THUMOS14/Annotations/validation/annotationF",
     'test': "/mnt/louis-consistent/Datasets/THUMOS14/Annotations/test/annotationF"}
 
-rgb_datalist = {x: read_from_anndir(rgb_root[x], anndir[x], mode='rgb', y_range=y_range, ordinal=True, stack_length=10) for x in ['train', 'val', 'test']}
+parse = thumo14_parse_builder(mode='two_stream', i3d=True)
+
+rgb_datalist = {x: read_from_anndir(anndir[x], root=root[x], mode='rgb', y_range=y_range, ordinal=True, stack_length=10) for x in ['train', 'val', 'test']}
 rgb_train_datalist = [a+b for a, b in zip(rgb_datalist['train'], rgb_datalist['val'])]
+rgb_test_datalist = rgb_datalist['test']
 
-flow_datalist = {x: read_from_anndir(flow_root[x], anndir[x], mode='flow', y_range=y_range, ordinal=True, stack_length=10) for x in ['train', 'val', 'test']}
-flow_train_datalist = [a+b for a, b in zip(flow_datalist['train'], flow_datalist['val'])]
-
-two_stream_train_datalist = [list(i) for i in zip(rgb_train_datalist[0], flow_train_datalist[0])]
-two_stream_test_datalist = [list(i) for i in zip(rgb_datalist['test'][0], flow_datalist['test'][0])]
-
-train_dataset = build_dataset_from_slices(two_stream_train_datalist, flow_train_datalist[1], shuffle=True, i3d=True, mode='two_stream')
-test_dataset = build_dataset_from_slices(two_stream_test_datalist, flow_datalist['test'][1], shuffle=False, i3d=True, mode='two_stream')
+train_dataset = build_dataset_from_slices(*rgb_train_datalist, shuffle=True, parse_func=parse)
+test_dataset = build_dataset_from_slices(*rgb_test_datalist, shuffle=False, parse_func=parse)
 
 with tf.distribute.MirroredStrategy():
     rgb_model = tf.keras.models.load_model(rgb_model_path)
