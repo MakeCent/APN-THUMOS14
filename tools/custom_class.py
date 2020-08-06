@@ -41,12 +41,12 @@ class BiasLayer(tf.keras.layers.Layer):
 class RGBLossCallback(tf.keras.callbacks.Callback):
 
     def on_test_begin(self, logs=None):
-        self.n_mae = []
+        self.mae_od = []
         self.loss = []
 
     def on_test_batch_end(self, batch, logs=None):
         self.loss.append(logs['loss'])
-        self.n_mae.append(logs['n_mae'])
+        self.mae_od.append(logs['mae_od'])
 
 
 class FLowLossCallback(tf.keras.callbacks.Callback):

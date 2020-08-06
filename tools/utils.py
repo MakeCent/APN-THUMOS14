@@ -354,27 +354,28 @@ def action_search(completeness_array, min_T, max_T, min_L):
         for e_i in C_endframe:
             C_action_length = e_i - s_i + 1
             if C_action_length > min_L:
-                action_template = np.linspace(0, 100, C_action_length)
-                predicted_sequence = P[s_i:e_i + 1]
-                mse = ((action_template - predicted_sequence) ** 2).mean()
-                action_candidate = [s_i, e_i, mse]
-                any_intersection = False
-                beat_any_one = False
-                if mse < 833:
-                    for i, action in enumerate(action_detected):
-                        iou_e = compute_iou(action, action_candidate)
-                        # if iou_e > 0.95:
-                        #     any_intersection = True
-                        #     beat_any_one = False
-                        #     break
-                        if iou_e > 0:
-                            any_intersection = True
-                            if action_candidate[2] < action[2]:
-                                beat_any_one = True
-                                action_detected.pop(i)
-
-                    if beat_any_one or not any_intersection:
-                        action_detected.append(action_candidate)
+                if not action_detected:
+                    iou_vector = np.array([0])
+                else:
+                    iou_vector = matrix_iou(np.array([[s_i, e_i]]), np.array(action_detected)).squeeze(axis=0)
+                if iou_vector.max() < 0.95:
+                    action_template = np.linspace(0, 100, C_action_length)
+                    predicted_sequence = P[s_i:e_i + 1]
+                    mse = ((action_template - predicted_sequence) ** 2).mean()
+                    action_candidate = [s_i, e_i, mse]
+                    if mse < 833:
+                        if iou_vector.max() == 0:
+                            action_detected.append(action_candidate)
+                            continue
+                        else:
+                            intersection_actions_idx = np.argwhere(iou_vector > 0).squeeze(axis=-1)
+                            beat_any_one = False
+                            for i in intersection_actions_idx:
+                                if action_candidate[2] < action_detected[i][2]:
+                                    beat_any_one = True
+                                    action_detected.pop(i)
+                            if beat_any_one:
+                                action_detected.append(action_candidate)
     action_detected.sort(key=lambda x: x[2])
     return np.array(action_detected).reshape(-1, 3)
 
@@ -428,3 +429,9 @@ def action_ap(predictions, temporal_annotations, IoU, min_T=60, max_T=30, min_L=
         return ap
 
 
+def imshow(array, **kwargs):
+    from matplotlib import pyplot as plt
+    img = (array + 1) / 2
+    plt.figure()
+    plt.imshow(img, **kwargs)
+    plt.show()

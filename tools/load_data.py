@@ -60,13 +60,15 @@ def generate_labels(length, y_range, ordinal=False, multi_action=False, action_i
 
 def path_rgb2flow(rgb_path):
     import tensorflow as tf
-    q = tf.strings.split(rgb_path, sep='/')
-    flow_x_path = q[:-1] + tf.constant('/flow_x/flow_x_') + tf.strings.as_string(
-        tf.strings.to_number(tf.strings.split(q[-1], sep='.')[0], out_type=tf.dtypes.int64) + 1, width=5,
-        fill='0') + tf.constant('.jpg')
-    flow_y_path = q[:-1] + tf.constant('/flow_y/flow_y_') + tf.strings.as_string(
-        tf.strings.to_number(tf.strings.split(q[-1], sep='.')[0], out_type=tf.dtypes.int64) + 1, width=5,
-        fill='0') + tf.constant('.jpg')
+    t = tf.strings.regex_replace(rgb_path, 'Images', 'OpticalFlows', replace_global=True, name=None)
+    f_x = tf.strings.regex_replace(t, '[0-9]+.jpg', 'flow_x/flow_x_', replace_global=True, name=None)
+    f_y = tf.strings.regex_replace(t, '[0-9]+.jpg', 'flow_y/flow_y_', replace_global=True, name=None)
+    a = tf.strings.substr(t, -9, 5)
+    a = tf.strings.to_number(a, out_type=tf.dtypes.int64) + 1
+    a = tf.strings.as_string(a, width=5, fill='0')
+    b = tf.constant('.jpg')
+    flow_x_path = f_x+a+b
+    flow_y_path = f_y+a+b
     return tf.stack([flow_x_path, flow_y_path])
 
 
@@ -177,11 +179,11 @@ def thumo14_parse_builder(mode='rgb', i3d=False):
         flow_list = tf.reshape(flow_list, [-1])
         flow = i3d_stack_flow_decode_format(flow_list)
         if labels is None:
-            return rgb, flow
+            return {'rgb_input': rgb, 'flow_input': flow}
         elif weights is None:
-            return (rgb, flow), labels
+            return {'rgb_input': rgb, 'flow_input': flow}, labels
         else:
-            return (rgb, flow), labels, weights
+            return {'rgb_input': rgb, 'flow_input': flow}, labels, weights
 
     def stack_decode_format(filepath_list, labels=None, weights=None):
         """Decode stacked image paths to stacked image tensors and format to desired format"""
@@ -201,7 +203,7 @@ def thumo14_parse_builder(mode='rgb', i3d=False):
     if i3d:
         if mode == 'rgb':
             parse_function = i3d_stack_decode_format
-        elif mode == 'flow' or 'w_flow':
+        elif mode == 'flow' or mode == 'w_flow':
             parse_function = i3d_stack_flow_decode_format
         elif mode == 'two_stream':
             parse_function = i3d_two_stream_decode_format
@@ -290,6 +292,7 @@ def find_imgs(video_path, suffix='jpg', stack_length=1):
     if isinstance(video_path, str):
         video_path = Path(video_path)
     imgs_list = [str(jp) for jp in sorted(video_path.glob('*.{}'.format(suffix)))]
+    del imgs_list[-1]  # for alignment with optical flow images.
     stacked_imgs_list = [imgs_list[i:i + stack_length] for i in range(0, len(imgs_list) - stack_length + 1)]
     return stacked_imgs_list
 

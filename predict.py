@@ -3,26 +3,25 @@
 # File  : train.py.py
 # Author: Chongkai LU
 # Date  : 6/9/2020
-
 from tools.custom_class import *
 from tools.load_data import *
 from tools.utils import *
 from pathlib import Path
 import numpy as np
-import tensorflow as tf
+import pandas as pd
 
 # %% Test on a Untrimmed video
-action = "GolfSwing"
+action = 'BaseballPitch'
 y_range = (1, 100)
 n_mae = normalize_mae(y_range[1] - y_range[0] + 1)
 
-rgb_model_path = "/mnt/louis-consistent/Saved/THUMOS14_output/GolfSwing/Model/2020-07-01-01:18:02/50-24.19.h5"
+rgb_model_path = "/mnt/louis-consistent/Saved/THUMOS14_output/GolfSwing/Model/2020-08-01-15-25-18/30-20.68.h5"
 # rgb_video_path = "/mnt/louis-consistent/Datasets/THUMOS14/Images/test/video_test_0000028"
 # rgb_img_list = find_imgs(rgb_video_path)
 # rgb_untrimmed_video = build_dataset_from_slices(rgb_img_list, batch_size=1, shuffle=False)
 
 ordinal = True
-flow_model_path = "/mnt/louis-consistent/Saved/THUMOS14_output/GolfSwing/50-22.09.h5"
+flow_model_path = "/mnt/louis-consistent/Saved/THUMOS14_output/BaseballPitch/Model/2020-08-05-17-47-57/30-24.69.h5"
 # flow_video_path = "/mnt/louis-consistent/Datasets/THUMOS14/OpticalFlows/test/video_test_0000028"
 # flow_img_list = find_flows(flow_video_path)
 # flow_untrimmed_video = stack_optical_flow(flow_img_list, batch_size=1, shuffle=False)
@@ -50,12 +49,14 @@ annfile = {
 # video_gt = t.loc[t.iloc[:, 0] == Path(rgb_video_path).stem].iloc[:, 1:].values  # temporal annotations of the untrimmed video
 
 # %% Build datasets
-rgb_datalist = {x: read_from_annfile(rgb_root[x], annfile[x], (1, 100), ordinal=ordinal) for x in ['train', 'val', 'test']}
-rgb_train_dataset = build_dataset_from_slices(*rgb_datalist['train'], batch_size=1, shuffle=False)
-rgb_val_dataset = build_dataset_from_slices(*rgb_datalist['val'], batch_size=1, shuffle=False)
-rgb_test_dataset = build_dataset_from_slices(*rgb_datalist['test'], batch_size=1, shuffle=False)
+rgb_datalist = {x: read_from_annfile(rgb_root[x], annfile[x], y_range=(1, 100), ordinal=ordinal, stack_length=10) for x in ['train', 'val', 'test']}
+parse_function = thumo14_parse_builder(i3d=True, mode='rgb')
+rgb_train_dataset = build_dataset_from_slices(*rgb_datalist['train'], batch_size=1, shuffle=False, parse_func=parse_function)
+rgb_val_dataset = build_dataset_from_slices(*rgb_datalist['val'], batch_size=1, shuffle=False, parse_func=parse_function)
+rgb_test_dataset = build_dataset_from_slices(*rgb_datalist['test'], batch_size=1, shuffle=False, parse_func=parse_function)
 
-flow_datalist = {x: read_from_annfile(flow_root[x], annfile[x], (1, 100), mode='flow', ordinal=ordinal, stack_length=10) for x in ['train', 'val', 'test']}
+flow_datalist = {x: read_from_annfile(flow_root[x], annfile[x], y_range=(1, 100), mode='flow', ordinal=ordinal, stack_length=10) for x in ['train', 'val', 'test']}
+parse_function = thumo14_parse_builder(i3d=True, mode='flow')
 flow_train_dataset = build_dataset_from_slices(*flow_datalist['train'], batch_size=1, shuffle=False)
 flow_val_dataset = build_dataset_from_slices(*flow_datalist['val'], batch_size=1, shuffle=False)
 flow_test_dataset = build_dataset_from_slices(*flow_datalist['test'], batch_size=1, shuffle=False)
@@ -73,7 +74,7 @@ flow_test_records = FLowLossCallback()
 
 # %% Prediction on trimmed videos and single untrimmed video
 with strategy.scope():
-    rgb_model = tf.keras.models.load_model(rgb_model_path, compile=False, custom_objects={'BiasLayer': MultiAction_BiasLayer})
+    rgb_model = tf.keras.models.load_model(rgb_model_path, compile=False, custom_objects={'BiasLayer': BiasLayer})
     rgb_model = tf.keras.Sequential([rgb_model, tf.keras.layers.Reshape((100,))])
     rgb_model.compile(loss=rgb_loss, metrics=[rgb_metric])
     # rgb_train_prediction = rgb_model.predict(rgb_train_dataset, verbose=1)
@@ -84,7 +85,7 @@ with strategy.scope():
     # rgb_test_evaluation = rgb_model.evaluate(rgb_test_dataset, verbose=1, callbacks=[rgb_test_records])
     # rgb_video_prediction = rgb_model.predict(rgb_untrimmed_video, verbose=1)
 
-    flow_model = tf.keras.models.load_model(flow_model_path, compile=False, custom_objects={'BiasLayer': MultiAction_BiasLayer})
+    flow_model = tf.keras.models.load_model(flow_model_path, compile=False, custom_objects={'BiasLayer': BiasLayer})
     flow_model = tf.keras.Sequential([flow_model, tf.keras.layers.Reshape((100,))])
     flow_model.compile(loss=flow_loss, metrics=[flow_metric])
     # flow_train_prediction = flow_model.predict(flow_train_dataset, verbose=1)
@@ -99,7 +100,7 @@ with strategy.scope():
 # # get_boxplot(datalist['test'][1], test_records['n_mae'])
 
 # %% Predict on untrimmed videos
-import pandas as pd
+
 temporal_annotation = pd.read_csv(annfile['test'], header=None)
 video_names = temporal_annotation.iloc[:, 0].unique()
 rgb_untrimmed_predictions = {}
