@@ -5,7 +5,7 @@ from tools.utils import *
 
 np.set_printoptions(suppress=True)
 
-prediction_file_location = './fused_pre'
+prediction_file_location = 'saved/Multi-task_fused_prediction'
 with open(prediction_file_location, 'r') as f:
     list_predictions = json.load(f)
 

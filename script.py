@@ -50,20 +50,20 @@ for v in video_names:
     rgb_predictions[v] = ordinal2completeness(np.squeeze(rgb_v_pre))
     flow_predictions[v] = ordinal2completeness(np.squeeze(flow_v_pre))
     fused_predictions[v] = (rgb_predictions[v][:flow_predictions[v].shape[0], :] + flow_predictions[v]) / 2
-# with open("rgb_pre", 'w') as f:
+# with open("Multi-task_rgb_prediction", 'w') as f:
 #     list_rgb_predictions = {k: v.tolist() for k, v in rgb_predictions.items()}
 #     json.dump(list_rgb_predictions, f)
-# with open("flow_pre", 'w') as f:
+# with open("Multi-task_flow_prediction", 'w') as f:
 #     list_flow_predictions = {k: v.tolist() for k, v in flow_predictions.items()}
 #     json.dump(list_flow_predictions, f)
-# with open("fused_pre", 'w') as f:
+# with open("Multi-task_fused_prediction", 'w') as f:
 #     list_fused_predictions = {k: v.tolist() for k, v in fused_predictions.items()}
 #     json.dump(list_fused_predictions, f)
 
 # %% Detect action
-with open('rgb_pre', 'r') as f:
+with open('Multi-task_rgb_prediction', 'r') as f:
     list_rgb_predictions = json.load(f)
-with open('flow_pre', 'r') as f:
+with open('Multi-task_flow_prediction', 'r') as f:
     list_flow_predictions = json.load(f)
 rgb_predictions = {k: np.array(v) for k, v in list_rgb_predictions.items()}
 flow_predictions = {k: np.array(v) for k, v in list_flow_predictions.items()}
