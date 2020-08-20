@@ -21,8 +21,8 @@ loss, metric = 'binary_crossentropy', mae_od
 # %% Also test on trimmed train, validation, and test dataset
 if mode == 'rgb' or mode == 'two_stream':
     root = {'train': "/mnt/louis-consistent/Datasets/THUMOS14/Images/train",
-                'val': "/mnt/louis-consistent/Datasets/THUMOS14/Images/validation",
-                'test': "/mnt/louis-consistent/Datasets/THUMOS14/Images/test"}
+            'val': "/mnt/louis-consistent/Datasets/THUMOS14/Images/validation",
+            'test': "/mnt/louis-consistent/Datasets/THUMOS14/Images/test"}
 else:
     root = {'train': "/mnt/louis-consistent/Datasets/THUMOS14/OpticalFlows/train",
             'val': "/mnt/louis-consistent/Datasets/THUMOS14/OpticalFlows/validation",

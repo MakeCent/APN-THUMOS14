@@ -24,7 +24,6 @@ AUTOTUNE = tf.data.experimental.AUTOTUNE
 fix_bug()
 now = datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
 # %% wandb Initialization
-# Configurations. If you don't use wandb, just manually set these values.
 default_config = dict(
     y_s=1,
     y_e=100,
@@ -32,36 +31,38 @@ default_config = dict(
     batch_size=32,
     epochs=50,
     agent=agent,
-    action='BaseballPitch',
-    mode='rgb'
+    action='BasketballDunk',
+    mode='flow'
 )
+wandb.init(config=default_config, name=now)
+config = wandb.config
+# Configurations. If you don't use wandb, manually set below variables.
+y_range = (config.y_s, config.y_e)
+y_nums = y_range[1] - y_range[0] + 1
+learning_rate = config.learning_rate
+batch_size = config.batch_size
+epochs = config.epochs
+action = config.action
+mode = config.mode
+action_num = 1
+
 ordinal = True
-mode = default_config['mode']
 stack_length = 10
 weighted = False
 pretrain = True
-notes = 'i3d_{}_{}'.format(default_config['action'], mode)
-
-# Just for wandb
-tags = [default_config['action'], mode, 'i3d']
+# Configurations. If you don't use wandb, manually set above variables.
+tags = [action, mode, 'i3d']
 if ordinal:
     tags.append("od")
 if weighted:
     tags.append("weighted")
 if stack_length > 1:
     tags.append("stack{}".format(stack_length))
-wandb.init(config=default_config, name=now, tags=tags, notes=notes)
-config = wandb.config
+
+wandb.run.tags = tags
+wandb.run.notes = 'i3d_{}_{}'.format(action, mode)
+wandb.run.save()
 wandbcb = WandbCallback(monitor='val_mae_od', save_model=False)
-
-y_range = (config.y_s, config.y_e)
-y_nums = y_range[1] - y_range[0] + 1
-learning_rate = config.learning_rate
-batch_size = config.batch_size
-epochs = config.epochs
-action_num = 1
-action = config.action
-
 # %% Parameters, Configuration, and Initialization
 model_name = now
 if mode == 'rgb':

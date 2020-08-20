@@ -8,16 +8,16 @@ import numpy as np
 import json
 from tools.utils import *
 
-action = 'GolfSwing'
-mode = 'two-stream'
-
+action = 'HammerThrow'
+mode = 'flow'
+print('evaluate on {}_{}'.format(action, mode))
 np.set_printoptions(suppress=True)
-if mode == 'rgb' or mode == 'flow':
+if mode == 'rgb' or mode == 'flow' or mode == 'two-stream':
     prediction_file_location = 'saved/{}_{}_prediction'.format(action, mode)
     with open(prediction_file_location, 'r') as f:
         list_predictions = json.load(f)
     predictions = {k: np.array(v) for k, v in list_predictions.items()}
-else:
+elif mode == 'fused':
     rgb_prediction_file_location = 'saved/{}_rgb_prediction'.format(action)
     flow_prediction_file_location = 'saved/{}_flow_prediction'.format(action)
     with open(rgb_prediction_file_location, 'r') as f1:

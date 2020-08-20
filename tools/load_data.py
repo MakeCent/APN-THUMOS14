@@ -91,6 +91,8 @@ def read_from_annfile(root, annfile, mode='rgb', stack_length=1, weighted=False,
 
     stacked_list, labels, weights = [], [], []
     for video, start, end in temporal_annotations.itertuples(index=False):
+        if end-start < stack_length:
+            continue
         if mode == 'rgb':
             v_paths = ["{}/{}/{}.jpg".format(root, video, str(num).zfill(5)) for num in np.arange(start, end)]
             v_stacked_paths = [v_paths[i:i + stack_length] for i in range(0, len(v_paths) - stack_length + 1)]
@@ -100,9 +102,9 @@ def read_from_annfile(root, annfile, mode='rgb', stack_length=1, weighted=False,
             v_stacked_paths = [v_paths[2 * i:2 * i + stack_length * 2] for i in
                                range(0, len(v_paths) // 2 - stack_length + 1)]
         stacked_list.extend(v_stacked_paths)
-
         v_stacked_length = len(v_stacked_paths)
         labels.extend(generate_labels(v_stacked_length, **kwargs))
+
         if weighted:
             w_10 = [3, 2, 1, 1, 1, 1, 1, 1, 2, 3]
             weights.extend(np.hstack([w * p for w, p in zip(w_10, np.array_split(np.ones(v_stacked_length), 10))]))
@@ -276,7 +278,7 @@ def build_dataset_from_slices(data_list, labels_list=None, weighs=None, parse_fu
     if augment:
         dataset = dataset.map(augment, num_parallel_calls=AUTOTUNE)
     if batch_size > 0:
-        dataset = dataset.batch(batch_size)
+        dataset = dataset.batch(batch_size, drop_remainder=True)
     if prefetch:
         dataset = dataset.prefetch(buffer_size=AUTOTUNE)
     return dataset
