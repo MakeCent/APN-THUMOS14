@@ -1,8 +1,13 @@
 import wandb
-
+import json
 api = wandb.Api()
-run = api.run("makecent/thumos14/gayzzylu")
-
+run = api.run("makecent/thumos14/9vpxrg4k")
+with open("saved/CliffDiving_flow_search", 'r') as f:
+    ap = json.load(f)
+best_parm = max(ap, key=ap.get)
+best_ap = ap[best_parm]
+run.summary['average_precision'] = best_ap
+run.summary.update()
 import socket
 import pandas as pd
 # file_path = "/mnt/louis-consistent/Saved/THUMOS14_output/CleanAndJerk/History/2020-08-09-10-16-29/history.csv"
