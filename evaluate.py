@@ -8,8 +8,8 @@ import numpy as np
 import json
 from tools.utils import *
 
-action = 'HammerThrow'
-mode = 'flow'
+action = 'Shotput'
+mode = 'fused'
 print('evaluate on {}_{}'.format(action, mode))
 np.set_printoptions(suppress=True)
 if mode == 'rgb' or mode == 'flow' or mode == 'two-stream':

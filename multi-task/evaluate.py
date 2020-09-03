@@ -5,7 +5,9 @@ from tools.utils import *
 
 np.set_printoptions(suppress=True)
 
-prediction_file_location = 'saved/Multi-task_fused_prediction'
+mode = 'rgb'
+prediction_file_location = 'saved/Multi-task_{}_prediction'.format(mode)
+print('evaluate on Multi-task_{}'.format(mode))
 with open(prediction_file_location, 'r') as f:
     list_predictions = json.load(f)
 
@@ -50,4 +52,5 @@ mAP = np.array(list(best_ap.values())).mean()
 
 print("mAP: {:.2f}".format(mAP))
 
-
+with open('saved/Multi-task_{}_search'.format(mode), 'w') as f:
+    json.dump(ap, f)
