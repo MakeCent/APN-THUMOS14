@@ -22,24 +22,35 @@ default_config = dict(
     batch_size=32,
     epochs=20,
     agent=agent,
-    action='GoldSwing'
+    action='GolfSwing'
 )
-
+wandb.init(config=default_config, name=now)
+config = wandb.config
+y_range = (1, 100)
+y_nums = 100
 stack_length = 10
-notes = 'two_stream fine-tune'
-action = default_config['action']
+ordinal = True
+weighted = False
+learning_rate = config.learning_rate
+epochs = config.epochs
+action = config.action
+batch_size = config.batch_size
+action_num = 1
 # Just for wandb
-tags = [action, 'two_stream', 'i3d', 'od', 'stack10']
-wandb.init(config=default_config, name=now, tags=tags, notes=notes)
+tags = [action, 'two_stream', 'i3d']
+if ordinal:
+    tags.append("od")
+if weighted:
+    tags.append("weighted")
+if stack_length > 1:
+    tags.append("stack{}".format(stack_length))
+
+wandb.run.tags = tags
+wandb.run.notes = 'i3d_{}_two-stream_fine-tune'.format(action)
+wandb.run.save()
 config = wandb.config
 wandbcb = WandbCallback(monitor='val_mae_od', save_model=False)
 
-y_range = (1, 100)
-y_nums = 100
-learning_rate = config.learning_rate
-batch_size = config.batch_size
-epochs = config.epochs
-action_num = 1
 
 # %% Basic information
 rgb_model_path = "/mnt/louis-consistent/Saved/THUMOS14_output/Multi-task/Model/2020-07-07-21-08-04/13-19.10.h5"
@@ -56,7 +67,7 @@ annfile = {
     'test': "/mnt/louis-consistent/Datasets/THUMOS14/Annotations/test/annotationF/{}_testF.csv".format(
         action)}
 
-output_path = '/mnt/louis-consistent/Saved/THUMOS14_output/Multi-task'  # Directory to save model and history
+output_path = '/mnt/louis-consistent/Saved/THUMOS14_output/{}'.format(action)  # Directory to save model and history
 history_path = Path(output_path, 'History', model_name)
 models_path = Path(output_path, 'Model', model_name)
 history_path.mkdir(parents=True, exist_ok=True)

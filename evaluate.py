@@ -8,7 +8,7 @@ import numpy as np
 import json
 from tools.utils import *
 
-action = 'Shotput'
+action = 'BaseballPitch'
 mode = 'fused'
 print('evaluate on {}_{}'.format(action, mode))
 np.set_printoptions(suppress=True)
