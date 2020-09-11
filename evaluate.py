@@ -37,9 +37,7 @@ det = {}
 gt = {}
 
 anndir = "/mnt/louis-consistent/Datasets/THUMOS14/Annotations/test/annotationF"
-ac_ta = pd.read_csv(
-    "{}/{}_testF.csv".format(anndir, action),
-    header=None).values
+ac_ta = pd.read_csv("{}/{}_testF.csv".format(anndir, action), header=None).values
 for min_T in [60, 70, 80]:
     for max_T in [20, 30, 40]:
         for min_L in [30, 60, 80]:

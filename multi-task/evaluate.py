@@ -3,14 +3,14 @@ import numpy as np
 import pandas as pd
 from tools.utils import *
 
+
+mode = 'two_stream'
+print('evaluate on Multi-task_{}'.format(mode))
 np.set_printoptions(suppress=True)
 
-mode = 'fused'
 prediction_file_location = 'saved/Multi-task_{}_prediction'.format(mode)
-print('evaluate on Multi-task_{}'.format(mode))
 with open(prediction_file_location, 'r') as f:
     list_predictions = json.load(f)
-
 predictions = {k: np.array(v) for k, v in list_predictions.items()}
 
 
@@ -29,11 +29,10 @@ det = {}
 gt = {}
 best_ap = {}
 best_parm = {}
+anndir = "/mnt/louis-consistent/Datasets/THUMOS14/Annotations/test/annotationF"
 with open('saved/Multi-task_{}_best'.format(mode), 'w') as f1:
     for ac_name, ac_idx in action_idx.items():
-        ac_ta = pd.read_csv(
-            "{}/{}_testF.csv".format("/mnt/louis-consistent/Datasets/THUMOS14/Annotations/test/annotationF", ac_name),
-            header=None).values
+        ac_ta = pd.read_csv("{}/{}_testF.csv".format(anndir, ac_name), header=None).values
         ap[ac_name] = {}
         det[ac_name] = {}
         gt[ac_name] = {}

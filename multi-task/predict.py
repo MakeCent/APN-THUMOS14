@@ -17,7 +17,7 @@ y_range = (1, 100)
 n_mae = normalize_mae(y_range[1] - y_range[0] + 1)
 
 model_path = "/mnt/louis-consistent/Saved/THUMOS14_output/Multi-task/Model/Two-Stream_Fine-Tune/05-17.30.h5"
-loss, metric = 'binary_crossentropy', mae_od
+loss, metric = multi_binarycrossentropy, multi_od_metric
 # %% Also test on trimmed train, validation, and test dataset
 if mode == 'rgb' or mode == 'two_stream':
     root = {'train': "/mnt/louis-consistent/Datasets/THUMOS14/Images/train",
@@ -35,7 +35,6 @@ anndir = {
 # %% Load model
 
 model = tf.keras.models.load_model(model_path, compile=False, custom_objects={'BiasLayer': BiasLayer})
-model = tf.keras.Sequential([model, tf.keras.layers.Reshape((100,))])
 model.compile(loss=loss, metrics=[metric])
 
 # %% Predict on untrimmed videos
@@ -46,7 +45,7 @@ predictions = {}
 for v in video_names:
     video_path = Path(root['test'], v)
     if mode == 'rgb' or mode == 'two_stream':
-        data_list = find_imgs(video_path)
+        data_list = find_imgs(video_path, stack_length=10)
     else:
         data_list = find_flows(video_path)
 
