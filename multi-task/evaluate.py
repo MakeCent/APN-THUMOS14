@@ -5,7 +5,7 @@ from tools.utils import *
 
 np.set_printoptions(suppress=True)
 
-mode = 'rgb'
+mode = 'fused'
 prediction_file_location = 'saved/Multi-task_{}_prediction'.format(mode)
 print('evaluate on Multi-task_{}'.format(mode))
 with open(prediction_file_location, 'r') as f:
@@ -29,28 +29,30 @@ det = {}
 gt = {}
 best_ap = {}
 best_parm = {}
-for ac_name, ac_idx in action_idx.items():
-    ac_ta = pd.read_csv(
-        "{}/{}_testF.csv".format("/mnt/louis-consistent/Datasets/THUMOS14/Annotations/test/annotationF", ac_name),
-        header=None).values
-    ap[ac_name] = {}
-    det[ac_name] = {}
-    gt[ac_name] = {}
-    for min_T in [60, 70, 80]:
-        for max_T in [20, 30, 40]:
-            for min_L in [30, 60, 80]:
-                ac_ap, ac_det, ac_gt = action_ap(predictions, ac_ta, IoU=IoU, min_T=min_T, max_T=max_T, min_L=min_L,
-                                                 down_sampling=down_sampling, action_idx=ac_idx, return_detections=True)
-                ap[ac_name]["{}-{}-{}".format(min_T, max_T, min_L)] = ac_ap
-                det[ac_name]["{}-{}-{}".format(min_T, max_T, min_L)] = ac_det
-                gt[ac_name]["{}-{}-{}".format(min_T, max_T, min_L)] = ac_gt
-    best_ap[ac_name] = ap[ac_name][max(ap[ac_name], key=ap[ac_name].get)]
-    best_parm[ac_name] = max(ap[ac_name], key=ap[ac_name].get)
-    print("{}: get best ap {:.2f} under {}".format(ac_name, best_ap[ac_name], best_parm[ac_name]))
+with open('saved/Multi-task_{}_best'.format(mode), 'w') as f1:
+    for ac_name, ac_idx in action_idx.items():
+        ac_ta = pd.read_csv(
+            "{}/{}_testF.csv".format("/mnt/louis-consistent/Datasets/THUMOS14/Annotations/test/annotationF", ac_name),
+            header=None).values
+        ap[ac_name] = {}
+        det[ac_name] = {}
+        gt[ac_name] = {}
+        for min_T in [60, 70, 80]:
+            for max_T in [20, 30, 40]:
+                for min_L in [30, 60, 80]:
+                    ac_ap, ac_det, ac_gt = action_ap(predictions, ac_ta, IoU=IoU, min_T=min_T, max_T=max_T, min_L=min_L,
+                                                     down_sampling=down_sampling, action_idx=ac_idx, return_detections=True)
+                    ap[ac_name]["{}-{}-{}".format(min_T, max_T, min_L)] = ac_ap
+                    det[ac_name]["{}-{}-{}".format(min_T, max_T, min_L)] = ac_det
+                    gt[ac_name]["{}-{}-{}".format(min_T, max_T, min_L)] = ac_gt
+        best_ap[ac_name] = ap[ac_name][max(ap[ac_name], key=ap[ac_name].get)]
+        best_parm[ac_name] = max(ap[ac_name], key=ap[ac_name].get)
+        print("{:17}: get best ap {:.2f} under {}".format(ac_name, best_ap[ac_name], best_parm[ac_name]))
+        f1.write('{:17} get best ap {:.2} under {}'.format(ac_name, best_ap[ac_name], best_parm[ac_name]))
 
-mAP = np.array(list(best_ap.values())).mean()
+    mAP = np.array(list(best_ap.values())).mean()
+    print("mAP: {:.2f}".format(mAP))
+    f1.write("mAP: {:.2f}".format(mAP))
 
-print("mAP: {:.2f}".format(mAP))
-
-with open('saved/Multi-task_{}_search'.format(mode), 'w') as f:
-    json.dump(ap, f)
+with open('saved/Multi-task_{}_search'.format(mode), 'w') as f2:
+    json.dump(ap, f2)
