@@ -60,7 +60,7 @@ models_path = Path(output_path, 'Model', model_name)
 history_path.mkdir(parents=True, exist_ok=True)
 models_path.mkdir(parents=True, exist_ok=True)
 # %% Build dataset
-parse = thumo14_parse_builder(mode='two_stream', i3d=True)
+parse = parse_builder(mode='two_stream', i3d=True)
 
 rgb_datalist = {x: read_from_anndir(anndir[x], root=root[x], mode='rgb', y_range=y_range, ordinal=True, stack_length=10) for x in ['train', 'val', 'test']}
 rgb_train_datalist = [a+b for a, b in zip(rgb_datalist['train'], rgb_datalist['val'])]

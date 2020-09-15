@@ -38,7 +38,7 @@ model = tf.keras.models.load_model(model_path, compile=False, custom_objects={'B
 model.compile(loss=loss, metrics=[metric])
 
 # %% Predict on untrimmed videos
-parse = thumo14_parse_builder(mode=mode, i3d=True)
+parse = parse_builder(mode=mode, i3d=True)
 temporal_annotation = pd.read_csv("/mnt/louis-consistent/Datasets/THUMOS14/Information/test_videos.txt", header=None)
 video_names = temporal_annotation.iloc[:, 0].unique()
 predictions = {}

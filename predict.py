@@ -50,13 +50,13 @@ annfile = {
 
 # %% Build datasets
 rgb_datalist = {x: read_from_annfile(rgb_root[x], annfile[x], y_range=(1, 100), ordinal=ordinal, stack_length=10) for x in ['train', 'val', 'test']}
-parse_function = thumo14_parse_builder(i3d=True, mode='rgb')
+parse_function = parse_builder(i3d=True, mode='rgb')
 rgb_train_dataset = build_dataset_from_slices(*rgb_datalist['train'], batch_size=1, shuffle=False, parse_func=parse_function)
 rgb_val_dataset = build_dataset_from_slices(*rgb_datalist['val'], batch_size=1, shuffle=False, parse_func=parse_function)
 rgb_test_dataset = build_dataset_from_slices(*rgb_datalist['test'], batch_size=1, shuffle=False, parse_func=parse_function)
 
 flow_datalist = {x: read_from_annfile(flow_root[x], annfile[x], y_range=(1, 100), mode='flow', ordinal=ordinal, stack_length=10) for x in ['train', 'val', 'test']}
-parse_function = thumo14_parse_builder(i3d=True, mode='flow')
+parse_function = parse_builder(i3d=True, mode='flow')
 flow_train_dataset = build_dataset_from_slices(*flow_datalist['train'], batch_size=1, shuffle=False)
 flow_val_dataset = build_dataset_from_slices(*flow_datalist['val'], batch_size=1, shuffle=False)
 flow_test_dataset = build_dataset_from_slices(*flow_datalist['test'], batch_size=1, shuffle=False)

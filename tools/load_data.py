@@ -138,7 +138,7 @@ def read_from_anndir(root, anndir, **kwargs):
     return datalist, ylist
 
 
-def thumo14_parse_builder(mode='rgb', i3d=False):
+def parse_builder(mode='rgb', i3d=False):
     import tensorflow as tf
 
     def i3d_stack_decode_format(filepath_list, labels=None, weights=None):

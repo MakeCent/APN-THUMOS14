@@ -92,7 +92,7 @@ history_path.mkdir(parents=True, exist_ok=True)
 models_path.mkdir(parents=True, exist_ok=True)
 
 # %% Build dataset
-parse_function = thumo14_parse_builder(i3d=True, mode=mode)
+parse_function = parse_builder(i3d=True, mode=mode)
 datalist = {x: read_from_annfile(root[x], annfile[x], mode=mode, y_range=y_range, ordinal=ordinal, stack_length=stack_length) for x in ['train', 'val', 'test']}
 train_val_datalist = [a+b for a, b in zip(datalist['train'], datalist['val'])]
 train_dataset = build_dataset_from_slices(*train_val_datalist, batch_size=batch_size, parse_func=parse_function)
